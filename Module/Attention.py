@@ -12,9 +12,9 @@ class SeparableAttn(nn.Module):
     def __init__(self, in_dim, activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0):
         super().__init__()
         self.model = nn.Sequential(
-            SeparableAttnCell(in_dim, 'T', activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0),
-            SeparableAttnCell(in_dim, 'W', activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0),
-            SeparableAttnCell(in_dim, 'H', activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0)
+            SeparableAttnCell(in_dim, 'T', activation, pooling_factor, padding_mode, padding_value),
+            SeparableAttnCell(in_dim, 'W', activation, pooling_factor, padding_mode, padding_value),
+            SeparableAttnCell(in_dim, 'H', activation, pooling_factor, padding_mode, padding_value)
         )
 
     def forward(self, x):
@@ -30,28 +30,22 @@ class SeparableAttnCell(nn.Module):
         self.attn_id = attn_id
         self.activation = activation
 
-        self.query_conv = SpectralNorm(  # SpectralNorm is added
-            nn.Conv3d(
-                in_channels=in_dim,
-                out_channels=in_dim // 8,
-                kernel_size=1
-            )
-        )
+        self.query_conv = nn.Conv3d(
+                                in_channels=in_dim,
+                                out_channels=in_dim // 8,
+                                kernel_size=1
+                            )
 
-        self.key_conv = SpectralNorm(
-            nn.Conv3d(
-                in_channels=in_dim,
-                out_channels=in_dim // 8,
-                kernel_size=1
-            )
-        )
-        self.value_conv = SpectralNorm(
-            nn.Conv3d(
-                in_channels=in_dim,
-                out_channels=in_dim,
-                kernel_size=1
-            )
-        )
+        self.key_conv = nn.Conv3d(
+                            in_channels=in_dim,
+                            out_channels=in_dim // 8,
+                            kernel_size=1
+                        )
+        self.value_conv = nn.Conv3d(
+                            in_channels=in_dim,
+                            out_channels=in_dim,
+                            kernel_size=1
+                        )
 
         self.pooling = nn.MaxPool3d(kernel_size=pooling_factor)
         self.pooling_factor = pooling_factor ** 3
@@ -116,28 +110,23 @@ class SelfAttention(nn.Module):
         self.chanel_in = in_dim
         self.activation = activation
 
-        self.query_conv = SpectralNorm( # SpectralNorm is added
-            nn.Conv2d(
-                in_channels=in_dim,
-                out_channels=in_dim // 8,
-                kernel_size=1
-            )
-        )
+        self.query_conv = nn.Conv2d(
+                            in_channels=in_dim,
+                            out_channels=in_dim // 8,
+                            kernel_size=1
+                        )
 
-        self.key_conv = SpectralNorm(
-            nn.Conv2d(
-                in_channels=in_dim,
-                out_channels=in_dim // 8,
-                kernel_size=1
-            )
-        )
-        self.value_conv = SpectralNorm(
-            nn.Conv2d(
-                in_channels=in_dim,
-                out_channels=in_dim,
-                kernel_size=1
-            )
-        )
+        self.key_conv = nn.Conv2d(
+                            in_channels=in_dim,
+                            out_channels=in_dim // 8,
+                            kernel_size=1
+                        )
+
+        self.value_conv = nn.Conv2d(
+                            in_channels=in_dim,
+                            out_channels=in_dim,
+                            kernel_size=1
+                        )
 
         self.pooling = nn.MaxPool2d(kernel_size=pooling_factor)
         self.pooling_factor = pooling_factor ** 2
@@ -155,20 +144,32 @@ class SelfAttention(nn.Module):
 
     def forward(self, x):
 
-        m_batchsize, C, width, height = x.size()
-        query = self.query_conv(x).view(m_batchsize, -1, width * height).permute(0, 2, 1)  # B x N x C
+        if len(x.size()) == 4:
+            m_batchsize, C, width, height = x.size()
+            time = 1
+        else:
+            m_batchsize, C, time, width, height = x.size()
+
+        N = time * width * height
+
+
+        query = self.query_conv(x).view(m_batchsize, -1, N).permute(0, 2, 1)  # B x N x C
 
         key = self.key_conv(x)  # B x C x H x W
-        key = self.pooling(key).view(m_batchsize, -1, width * height // self.pooling_factor) # B x C x (N // 4)
+        key = self.pooling(key).view(m_batchsize, -1, N // self.pooling_factor) # B x C x (N // 4)
 
         dist = torch.bmm(query, key) # B x N x (N // 4)
         attn_score = self.softmax(dist) # B x N x (N // 4)
 
         value = self.value_conv(x)
-        value = self.pooling(value).view(m_batchsize, -1, width * height // self.pooling_factor)  # B x C x (N // 4)
+        value = self.pooling(value).view(m_batchsize, -1, N // self.pooling_factor)  # B x C x (N // 4)
 
         out = torch.bmm(value, attn_score.permute(0, 2, 1)) # B x C x N
-        out = out.view(m_batchsize, C, width, height)
+
+        if len(x.size()) == 4:
+            out = out.view(m_batchsize, C, width, height)
+        else:
+            out = out.view(m_batchsize, C, time, width, height)
 
         out = self.gamma * out + x
         return out
