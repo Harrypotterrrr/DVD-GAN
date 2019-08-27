@@ -8,14 +8,19 @@ from Module.Normalization import ConditionalNorm, SpectralNorm
 
 class GResBlock(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size=None,
-                 padding=1, stride=1, n_class=None, bn=True,
+                 padding=1, stride=1, n_class=96, n_frames=48, bn=True,
                  activation=F.relu, upsample=True, downsample=False):
         super().__init__()
 
+        self.in_channel = in_channel
+        self.n_frames = n_frames
+        self.upsample = upsample
+        self.downsample = downsample
+        self.activation = activation
+        self.bn = bn
+
         if kernel_size is None:
             kernel_size = [3, 3]
-
-        # TODO gain = 2 ** 0.5
 
         self.conv0 = SpectralNorm(nn.Conv2d(in_channel, out_channel,
                                              kernel_size, stride, padding,
@@ -30,20 +35,21 @@ class GResBlock(nn.Module):
                                                    1, 1, 0))
             self.skip_proj = True
 
-        self.upsample = upsample
-        self.downsample = downsample
-        self.activation = activation
-        self.bn = bn
         if bn:
-            self.CBNorm1 = ConditionalNorm(in_channel, 148) # const number of class label!
-            self.CBNorm2 = ConditionalNorm(out_channel, 148)
+            self.CBNorm1 = ConditionalNorm(in_channel, n_class) # 2 x noise.size[1]
+            self.CBNorm2 = ConditionalNorm(out_channel, n_class)
 
     def forward(self, input, condition=None):
+
+        batch_size, T, C, W, H = input.size()
+        print(batch_size, T,C,W,H)
+
         out = input
 
         if self.bn:
-            # print('condition',condition.size()) #condition torch.Size([4, 148])
+            out = out.view(-1, C, W, H)
             out = self.CBNorm1(out, condition)
+            out = out.view(-1, T, C, W, H)
 
         out = self.activation(out)
 
@@ -54,7 +60,9 @@ class GResBlock(nn.Module):
         out = self.conv0(out)
 
         if self.bn:
+            out = out.view(batch_size, C, W * 2, H * 2)
             out = self.CBNorm2(out, condition)
+            out = out.view(batch_size*T, C, W * 2, H * 2)
 
         out = self.activation(out)
         out = self.conv1(out)
@@ -79,9 +87,11 @@ class GResBlock(nn.Module):
 
 if __name__ == "__main__":
 
-    gResBlock = GResBlock(20, 100, [3, 3])
-    x = torch.rand([4, 20, 64, 64])
-    condition = torch.rand([4, 148]) # const 148
+    n_class = 96
+
+    gResBlock = GResBlock(3, 100, [3, 3], n_frames=20)
+    x = torch.rand([4, 20, 3, 64, 64])
+    condition = torch.rand([4, n_class])
     y = gResBlock(x, condition)
     print(gResBlock)
     print(x.size())

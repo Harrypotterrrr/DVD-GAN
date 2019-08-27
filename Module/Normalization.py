@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from torch.nn import Parameter
 
+from tensorboardX import SummaryWriter
+
 def l2normalize(v, eps=1e-12):
     return v / (v.norm() + eps)
 
@@ -62,17 +64,19 @@ class SpectralNorm(nn.Module):
         return self.module.forward(*args)
 
 class ConditionalNorm(nn.Module):
-    def __init__(self, in_channel, n_condition=148):
+    def __init__(self, in_channel, n_condition=96):
         super().__init__()
 
         self.in_channel = in_channel
         self.bn = nn.BatchNorm2d(self.in_channel, affine=False)
 
-        self.embed = nn.Linear(n_condition, self.in_channel* 2)
+        self.embed = nn.Linear(n_condition, self.in_channel * 2)
         self.embed.weight.data[:, :self.in_channel].normal_(1, 0.02)
         self.embed.weight.data[:, self.in_channel:].zero_()
 
     def forward(self, input, class_id):
+        print(input.size())
+        print(self.in_channel)
         out = self.bn(input)
         embed = self.embed(class_id)
         gamma, beta = embed.chunk(2, 1)
@@ -87,9 +91,9 @@ class ConditionalNorm(nn.Module):
 
 if __name__ == "__main__":
 
-    cn = ConditionalNorm(3,2)
-    x = torch.rand([4, 3, 64,64])
-    class_id = torch.rand([4,2])
+    cn = ConditionalNorm(3, 2)
+    x = torch.rand([4, 3, 64, 64])
+    class_id = torch.rand([4, 2])
     y = cn(x, class_id)
     print(cn)
     print(x.size())
