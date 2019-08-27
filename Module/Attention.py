@@ -105,31 +105,31 @@ class SeparableAttnCell(nn.Module):
 
 class SelfAttention(nn.Module):
 
-    def __init__(self, in_dim, activation=F.relu, pooling_factor = 2):
+    def __init__(self, in_dim, activation=F.relu, pooling_factor = 2): # TODO for better compability
         super(SelfAttention, self).__init__()
         self.chanel_in = in_dim
         self.activation = activation
 
-        self.query_conv = nn.Conv2d(
+        self.query_conv = nn.Conv3d(
                             in_channels=in_dim,
                             out_channels=in_dim // 8,
                             kernel_size=1
                         )
 
-        self.key_conv = nn.Conv2d(
+        self.key_conv = nn.Conv3d(
                             in_channels=in_dim,
                             out_channels=in_dim // 8,
                             kernel_size=1
                         )
 
-        self.value_conv = nn.Conv2d(
+        self.value_conv = nn.Conv3d(
                             in_channels=in_dim,
                             out_channels=in_dim,
                             kernel_size=1
                         )
 
-        self.pooling = nn.MaxPool2d(kernel_size=pooling_factor)
-        self.pooling_factor = pooling_factor ** 2
+        self.pooling = nn.MaxPool3d(kernel_size=pooling_factor)
+        self.pooling_factor = pooling_factor ** 3
 
         self.gamma = nn.Parameter(torch.zeros(1))
 
