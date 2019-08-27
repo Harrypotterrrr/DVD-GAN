@@ -26,7 +26,6 @@ class SeparableAttnCell(nn.Module):
 
     def __init__(self, in_dim, attn_id = None, activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0):
         super().__init__()
-        self.chanel_in = in_dim
         self.attn_id = attn_id
         self.activation = activation
 
@@ -106,8 +105,8 @@ class SeparableAttnCell(nn.Module):
 class SelfAttention(nn.Module):
 
     def __init__(self, in_dim, activation=F.relu, pooling_factor = 2): # TODO for better compability
+
         super(SelfAttention, self).__init__()
-        self.chanel_in = in_dim
         self.activation = activation
 
         self.query_conv = nn.Conv3d(
@@ -177,10 +176,12 @@ class SelfAttention(nn.Module):
 
 if __name__ == "__main__":
 
-    self_attn = SelfAttention(64)
+    self_attn = SelfAttention(16) # no less than 8
     print(self_attn)
 
-    x = torch.rand(1, 64, 128, 128)
+    n_frames = 4
+
+    x = torch.rand(1, 16, n_frames, 32, 32)
     y = self_attn(x)
     print(x.size())
     print(y.size())
