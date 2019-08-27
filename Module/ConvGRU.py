@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.nn import init
 
 
@@ -9,7 +8,7 @@ class ConvGRUCell(nn.Module):
     Generate a convolutional GRU cell
     """
 
-    def __init__(self, input_size, hidden_size, kernel_size, activation=F.sigmoid):
+    def __init__(self, input_size, hidden_size, kernel_size, activation=torch.sigmoid):
         super().__init__()
         padding = kernel_size // 2
         self.input_size = input_size
@@ -47,7 +46,7 @@ class ConvGRUCell(nn.Module):
         stacked_inputs = torch.cat([x, prev_state], dim=1)
         update = self.activation(self.update_gate(stacked_inputs))
         reset = self.activation(self.reset_gate(stacked_inputs))
-        out_inputs = F.tanh(self.out_gate(torch.cat([x, prev_state * reset], dim=1)))
+        out_inputs = torch.tanh(self.out_gate(torch.cat([x, prev_state * reset], dim=1)))
         new_state = prev_state * (1 - update) + out_inputs * update
 
         return new_state
@@ -109,7 +108,7 @@ class ConvGRU(nn.Module):
         -------
         upd_hidden : 5D hidden representation. (layer, batch, channels, height, width).
         '''
-        if not hidden:
+        if hidden is None:
             hidden = [None]*self.n_layers
 
         input_ = x
