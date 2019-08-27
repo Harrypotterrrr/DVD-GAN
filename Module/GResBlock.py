@@ -7,15 +7,14 @@ from tensorboardX import SummaryWriter
 from Module.Normalization import ConditionalNorm, SpectralNorm
 
 class GResBlock(nn.Module):
+
     def __init__(self, in_channel, out_channel, kernel_size=None,
-                 padding=1, stride=1, n_class=96, n_frames=48, bn=True,
-                 activation=F.relu, upsample=True, downsample=False):
+                 padding=1, stride=1, n_class=96, bn=True,
+                 activation=F.relu, upsample_factor=2, downsample_factor=False):
         super().__init__()
 
-        self.in_channel = in_channel
-        self.n_frames = n_frames
-        self.upsample = upsample
-        self.downsample = downsample
+        self.upsample_factor = upsample_factor
+        self.downsample_factor = downsample_factor
         self.activation = activation
         self.bn = bn
 
@@ -30,72 +29,75 @@ class GResBlock(nn.Module):
                                              bias=True if bn else True))
 
         self.skip_proj = False
-        if in_channel != out_channel or upsample or downsample:
+        if in_channel != out_channel or upsample_factor or downsample:
             self.conv_sc = SpectralNorm(nn.Conv2d(in_channel, out_channel,
                                                    1, 1, 0))
             self.skip_proj = True
 
         if bn:
-            self.CBNorm1 = ConditionalNorm(in_channel, n_class) # 2 x noise.size[1]
+            self.CBNorm1 = ConditionalNorm(in_channel, n_class) # TODO 2 x noise.size[1]
             self.CBNorm2 = ConditionalNorm(out_channel, n_class)
 
-    def forward(self, input, condition=None):
+    def forward(self, x, condition=None):
 
-        batch_size, T, C, W, H = input.size()
-        print(batch_size, T,C,W,H)
+        batch_size, T, C, W, H = x.size()
+        x = x.view(-1, C, W, H) # combine temporal dimension into batch
 
-        out = input
+        out = x
 
         if self.bn:
-            out = out.view(-1, C, W, H)
             out = self.CBNorm1(out, condition)
-            out = out.view(-1, T, C, W, H)
 
         out = self.activation(out)
 
-        if self.upsample:
+        if self.upsample_factor != 0:
             # TODO different form papers
             out = F.interpolate(out, scale_factor=2)
 
         out = self.conv0(out)
 
         if self.bn:
-            out = out.view(batch_size, C, W * 2, H * 2)
+            out = out.view(batch_size * T, -1, W * 2, H * 2)
             out = self.CBNorm2(out, condition)
-            out = out.view(batch_size*T, C, W * 2, H * 2)
+            # out = out.view(batch_size*T, C, W * 2, H * 2)
 
         out = self.activation(out)
         out = self.conv1(out)
 
-        if self.downsample:
+        if self.downsample_factor:
             out = F.avg_pool2d(out, 2)
 
         if self.skip_proj:
-            skip = input
-            if self.upsample:
-                # TODO different form papers
-                skip = F.interpolate(skip, scale_factor=2)
+            skip = x
+            if self.upsample_factor != 0:
+                skip = F.interpolate(skip, scale_factor=self.upsample_factor)
             skip = self.conv_sc(skip)
-            if self.downsample:
+            if self.downsample_factor:
                 skip = F.avg_pool2d(skip, 2)
 
         else:
-            skip = input
+            skip = x
 
-        return out + skip
+        y = out + skip
+        y = y.view(batch_size, T, -1, W * 2, H * 2)
+
+        return y
 
 
 if __name__ == "__main__":
 
     n_class = 96
+    batch_size = 4
+    n_frame = 20
 
-    gResBlock = GResBlock(3, 100, [3, 3], n_frames=20)
-    x = torch.rand([4, 20, 3, 64, 64])
-    condition = torch.rand([4, n_class])
+    gResBlock = GResBlock(3, 100, [3, 3])
+    x = torch.rand([batch_size, n_frame, 3, 64, 64])
+    condition = torch.rand([batch_size, n_class])
+    condition = condition.repeat(n_frame, 1)
     y = gResBlock(x, condition)
     print(gResBlock)
     print(x.size())
     print(y.size())
 
-    with SummaryWriter(comment='gResBlock') as w:
-        w.add_graph(gResBlock, [x, condition, ])
+    # with SummaryWriter(comment='gResBlock') as w:
+    #     w.add_graph(gResBlock, [x, condition, ])
