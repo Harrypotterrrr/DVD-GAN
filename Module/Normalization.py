@@ -64,6 +64,7 @@ class SpectralNorm(nn.Module):
         return self.module.forward(*args)
 
 class ConditionalNorm(nn.Module):
+
     def __init__(self, in_channel, n_condition=96):
         super().__init__()
 
@@ -74,10 +75,8 @@ class ConditionalNorm(nn.Module):
         self.embed.weight.data[:, :self.in_channel].normal_(1, 0.02)
         self.embed.weight.data[:, self.in_channel:].zero_()
 
-    def forward(self, input, class_id):
-        print(input.size())
-        print(self.in_channel)
-        out = self.bn(input)
+    def forward(self, x, class_id):
+        out = self.bn(x)
         embed = self.embed(class_id)
         gamma, beta = embed.chunk(2, 1)
         # gamma = gamma.unsqueeze(2).unsqueeze(3)
