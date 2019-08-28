@@ -29,7 +29,7 @@ class GResBlock(nn.Module):
                                              bias=True if bn else True))
 
         self.skip_proj = False
-        if in_channel != out_channel or upsample_factor or downsample:
+        if in_channel != out_channel or upsample_factor or downsample_factor:
             self.conv_sc = SpectralNorm(nn.Conv2d(in_channel, out_channel,
                                                    1, 1, 0))
             self.skip_proj = True
