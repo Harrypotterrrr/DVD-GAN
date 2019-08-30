@@ -12,14 +12,14 @@ import os
 
 ##### Import libary for dataloader #####
 ##### https://github.com/kenshohara/3D-ResNets-PyTorch/blob/master/main.py
-from Dataset.transform.spatial_transforms import (
+from Dataloader.transform.spatial_transforms import (
     Compose, Normalize, Scale, CenterCrop, CornerCrop, MultiScaleCornerCrop,
     MultiScaleRandomCrop, RandomHorizontalFlip, ToTensor)
-from Dataset.transform.temporal_transforms import LoopPadding, TemporalRandomCrop
-from Dataset.transform.target_transforms import ClassLabel, VideoID
-from Dataset.transform.target_transforms import Compose as TargetCompose
-from Dataset.dataloader import get_training_set, get_validation_set, get_test_set
-from Dataset.mean import get_mean
+from Dataloader.transform.temporal_transforms import LoopPadding, TemporalRandomCrop
+from Dataloader.transform.target_transforms import ClassLabel, VideoID
+from Dataloader.transform.target_transforms import Compose as TargetCompose
+from Dataloader.dataloader import get_training_set, get_validation_set, get_test_set
+from Dataloader.mean import get_mean
 ########################################
 
 
@@ -89,9 +89,11 @@ def main(config):
 
     config.n_class = len(glob.glob(os.path.join(config.image_path, '*/')))
     print('number class:', config.n_class)
+
+
     # Data loader
-    data_loader = Data_Loader(config.train, config.dataset, config.image_path, config.imsize,
-                             config.batch_size, shuf=config.train)
+    # data_loader = Data_Loader(config.train, config.dataset, config.image_path, config.imsize,
+    #                          config.batch_size, shuf=config.train)
 
     # Create directories if not exist
     make_folder(config.model_save_path, config.version)
@@ -104,13 +106,17 @@ def main(config):
 
     if config.train:
         if config.model=='sagan':
-            trainer = Trainer(data_loader.loader(), config)
-        elif config.model == 'qgan':
-            trainer = qgan_trainer(data_loader.loader(), config)
+            # trainer = Trainer(data_loader.loader(), config) TODO ADD
+
+            trainer = Trainer(None, config)
+        # elif config.model == 'qgan':
+        #     trainer = qgan_trainer(data_loader.loader(), config)
+        else:
+            trainer = None
         trainer.train()
-    else:
-        tester = Tester(val_loader, config)
-        tester.test()
+    # else:
+    #     tester = Tester(val_loader, config)
+    #     tester.test()
 
 if __name__ == '__main__':
     config = get_parameters()

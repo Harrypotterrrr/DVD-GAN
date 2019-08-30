@@ -55,7 +55,7 @@ def get_parameters():
     parser.add_argument('--sample_step', type=int, default=100)
     parser.add_argument('--model_save_step', type=float, default=1.0)
 
-    # Dataset
+    # Dataloader
     parser.add_argument('--norm_value', type=int, default=1)
     parser.add_argument('--no_mean_norm', action='store_true', default=False)
     parser.add_argument('--std_norm', action='store_true', default=False)
@@ -67,6 +67,9 @@ def get_parameters():
     parser.add_argument('--sample_size', type=int, default=64)
     parser.add_argument('--sample_duration', type=int, default=12) # Temporal duration of inputs
 
+
+
+    parser.add_argument('--n_class', type=int, default=3)
 
 
     return parser.parse_args()

@@ -1,38 +1,7 @@
-#!/usr/bin/python
-#
-# Copyright 2018 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
-
-import argparse
-import functools
-import os
-import json
-import math
-from collections import defaultdict
-import random
-
-import numpy as np
 import torch
-import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torch.autograd import Variable
-from torch import Tensor
-from torch.nn import Parameter
+
 from torch.nn import init
 
 from Module.Normalization import ConditionalNorm, SpectralNorm 
@@ -117,6 +86,8 @@ class SpatialDiscriminator(nn.Module):
     def __init__(self, chn=128, n_class=3):
         super().__init__()
 
+        self.chn = chn
+
         def conv(in_channel, out_channel, downsample=True):
             return GResBlock(in_channel, out_channel,
                           bn=False,
@@ -144,51 +115,54 @@ class SpatialDiscriminator(nn.Module):
         self.embed.weight.data.uniform_(-0.1, 0.1)
         self.embed = spectral_norm(self.embed)
 
-    def forward(self, input, class_id):
+    def forward(self, x, class_id):
         
         # reshape input tensor from BxTxCxHxW to BTxCxHxW
-        B, T, C, H, W = input.size()
+        batch_size, T, C, W, H = x.size()
+        print(x.size())
 
-        input = input.view(B*T, C, H, W)
+        x = x.view(batch_size*T, C, H, W)
 
-        out = self.pre_conv(input)
-        out = out + self.pre_skip(F.avg_pool2d(input, 2))
+        out = self.pre_conv(x)
+        out = out + self.pre_skip(F.avg_pool2d(x, 2))
+
         # reshape back to BxTxCxHxW
-        _, C, H, W = out.size()
-        out = out.view(B, T, C, H, W)
-        # out = out.permute(0, 2, 1, 3, 4)
 
-        # print(out.size())
+        out = out.view(batch_size, T, -1, H // 2, W // 2)
+
         out = self.conv1(out) # BxTxCxHxW
-        out = out.permute(0, 2, 1, 3, 4) # BxCxTxHxW    
-        print(out.size())
-        exit()
+        out = out.permute(0, 2, 1, 3, 4) # BxCxTxHxW
+
         out = self.attn(out) # BxCxTxHxW
-        out = out.permute(0, 2, 1, 3, 4) # BxTxCxHxW
+        out = out.permute(0, 2, 1, 3, 4).contiguous() # BxTxCxHxW
+
         out = self.conv2(out)
 
+        print("after conv:", out.size())
 
         out = F.relu(out)
-        # out = out.view(out.size(0), out.size(1), -1)
-        out = out.view(B, T, out.size(1), -1)
+        out = out.view(batch_size, T, out.size(2), -1)
+
         # sum on H and W axis
         out = out.sum(3)
         # sum on T axis
         out = out.sum(1)
+
         out_linear = self.linear(out).squeeze(1)
 
-        
         embed = self.embed(class_id)
 
         prod = (out * embed).sum(1)
 
+
         return out_linear + prod
 
 def sample_k_frames(data, length, n_frame):
-	idx = torch.LongTensor(random.sample(range(0, length), n_frame)).cuda()
-	idx = idx.sort()
+    idx = torch.randint(0, length, n_frame)
+    # idx = torch.LongTensor(random.sample(range(0, length), n_frame)).cuda()
+    idx = idx.sort()
 
-	return data[:, idx[0], :, :, :]
+    return data[:, idx[0], :, :, :]
 
 
 def conv3x3x3(in_planes, out_planes, stride=1):
@@ -212,7 +186,7 @@ class Res3dBlock(nn.Module):
         self.bn2 = nn.BatchNorm3d(out_channel)
         self.downsample = downsample
         if self.downsample:
-        	self.conv_sc = nn.Sequential(
+            self.conv_sc = nn.Sequential(
                     nn.Conv3d(in_channel, out_channel, kernel_size=1, stride=stride, bias=False), 
                     nn.BatchNorm3d(out_channel))
         self.stride = stride
@@ -267,21 +241,21 @@ class TemporalDiscriminator(nn.Module):
         self.embed.weight.data.uniform_(-0.1, 0.1)
         self.embed = spectral_norm(self.embed)
 
-    def forward(self, input, class_id):
+    def forward(self, x, class_id):
 
         # pre-process with avg_pool2d to reduce tensor size
-        B, T, C, H, W = input.size()
-        input = F.avg_pool2d(input.view(B*T, C, H, W), kernel_size=2)
-        _, _, H, W = input.size()
-        input = input.view(B, T, C, H, W)
+        B, T, C, H, W = x.size()
+        x = F.avg_pool2d(x.view(B*T, C, H, W), kernel_size=2)
+        _, _, H, W = x.size()
+        x = x.view(B, T, C, H, W)
 
         #transpose to BxCxTxHxW
-        input = input.permute(0, 2, 1, 3, 4)
+        x = x.permute(0, 2, 1, 3, 4)
 
-        out = self.pre_conv(input)
+        out = self.pre_conv(x)
         # print(out.size())
         # print(out.type())
-        out = out + self.pre_skip(F.avg_pool3d(input, 2))
+        out = out + self.pre_skip(F.avg_pool3d(x, 2))
         # print(out.size())
         # print(out.type())
         out = self.res3d(out) # BxCxTxHxW
@@ -328,51 +302,51 @@ class TemporalDiscriminator(nn.Module):
         return out_linear + prod
 
 def main():
-  # m = torch.randn((3, 5, 1, 1, 1))
-  # n = torch.LongTensor(random.sample(range(0, 4), 2))
-  # l = m[:,n,:,:,:]
+    # m = torch.randn((3, 5, 1, 1, 1))
+    # n = torch.LongTensor(random.sample(range(0, 4), 2))
+    # l = m[:,n,:,:,:]
 
 
-  # m = torch.randn(5)
-  # n = m.view(-1, 1)
-  # l = n.repeat(1, 2) # 2 number of repeat
-  # l = l.view(-1)
-  model = TemporalDiscriminator()
-  model.cuda()
+    # m = torch.randn(5)
+    # n = m.view(-1, 1)
+    # l = n.repeat(1, 2) # 2 number of repeat
+    # l = l.view(-1)
+    model = TemporalDiscriminator()
+    model.cuda()
 
-  optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0, 0.9),
-                                             weight_decay=0.00001)
-  for i in range(100):
-	  data = torch.randn((3, 5, 3, 64, 64)).cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0, 0.9),
+                                               weight_decay=0.00001)
+    for i in range(100):
+        data = torch.randn((3, 5, 3, 64, 64)).cuda()
 
-	  label = torch.cuda.LongTensor(random.sample(range(0,3), 3))
+        label = torch.randint(0, 3, 3)
+        # label = torch.cuda.LongTensor(random.sample(range(0,3), 3))
 
-	  # data = sample_k_frames(data, data.size(1), 3)
+        # data = sample_k_frames(data, data.size(1), 3)
 
-	  B, T, C, H, W = data.size()
-	  data = F.avg_pool2d(data.view(B*T, C, H, W), kernel_size=2)
-	  _, _, H, W = data.size()
-	  # print(data.size())
-	  # print(data.type())
-	  data = data.view(B, T, C, H, W)
+        B, T, C, H, W = data.size()
+        data = F.avg_pool2d(data.view(B*T, C, H, W), kernel_size=2)
+        _, _, H, W = data.size()
+        # print(data.size())
+        # print(data.type())
+        data = data.view(B, T, C, H, W)
 
-	  #transpose to BxCxTxHxW
-	  data = data.transpose(1, 2).contiguous()
+        #transpose to BxCxTxHxW
+        data = data.transpose(1, 2).contiguous()
 
 
-	  out = model(data, label)
+        out = model(data, label)
 
-	  # print(out.type())
-	  # print(out.size())
+        # print(out.type())
+        # print(out.size())
 
-	  loss = torch.mean(out)
+        loss = torch.mean(out)
 
-	  print(loss)
+        print(loss)
 
-	  optimizer.zero_grad()
-	  loss.backward()
-	  optimizer.step()
-
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
 
 if __name__ == '__main__':
