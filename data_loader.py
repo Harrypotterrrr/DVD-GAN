@@ -25,7 +25,9 @@ class Data_Loader():
         transform = transforms.Compose(options)
         return transform
 
-    def load_lsun(self, classes=['church_outdoor_train','classroom_train']):
+    def load_lsun(self, classes=None):
+        if classes is None:
+            classes = ['church_outdoor_train','classroom_train']
         transforms = self.transform(True, True, True, False)
         dataset = dsets.LSUN(self.path, classes=classes, transform=transforms)
         return dataset
@@ -54,12 +56,15 @@ class Data_Loader():
             dataset = self.load_celeb()
         elif self.dataset == 'off':
             dataset = self.load_off()
+        else:
+            dataset = None
 
         print('dataset',len(dataset))
+
         loader = torch.utils.data.DataLoader(dataset=dataset,
                                               batch_size=self.batch,
                                               shuffle=self.shuf,
-                                              num_workers=2,
+                                              num_workers=16,
                                               drop_last=True)
         return loader
 

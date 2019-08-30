@@ -16,7 +16,7 @@ class Trainer(object):
     def __init__(self, data_loader, config):
 
         # Data loader
-        self.data_loader = data_loader
+        # self.data_loader = data_loader
 
         # exact model and loss
         self.model = config.model
@@ -65,7 +65,8 @@ class Trainer(object):
         self.sample_path = os.path.join(config.sample_path, self.version)
         self.model_save_path = os.path.join(config.model_save_path, self.version)
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cpu')
 
         print('build_model...')
         self.build_model()
@@ -80,16 +81,26 @@ class Trainer(object):
 
 
     def label_sampel(self):
+        # label = torch.tensor(self.batch_size, dtype=torch.int64)
         label = torch.LongTensor(self.batch_size, 1).random_()%self.n_class
+        print(self.batch_size)
+        print(self.n_class)
+        print(label)
+        print("&&&&&&&&&&&&&&&&&&&&")
+        # exit()
         one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
         return label.squeeze(1).to(self.device), one_hot.to(self.device)       
 
     def train(self):
 
         # Data iterator
-        data_iter = iter(self.data_loader)
-        step_per_epoch = len(self.data_loader)
-        model_save_step = int(self.model_save_step * step_per_epoch)
+
+        # data_iter = iter(self.data_loader) TODO ADD
+        # step_per_epoch = len(self.data_loader)
+
+        # model_save_step = int(self.model_save_step * step_per_epoch)
+
+        model_save_step = int(self.model_save_step * 10)
 
         # Fixed input for debugging
         fixed_z = tensor2var(torch.randn(self.batch_size, self.z_dim))
@@ -107,11 +118,11 @@ class Trainer(object):
 
             batch_size = 5
             in_dim = 120
-            n_class = 4
             n_frames = 4
             x = torch.randn(batch_size, in_dim)
             class_label = torch.randint(low=0, high=3, size=(batch_size,))
-            real_videos = torch.randn((batch_size, n_frames, 3, 64, 64)).cuda()
+            # real_videos = torch.randn((batch_size, n_frames, 3, 64, 64)).cuda() TODO ADD
+            real_videos = torch.randn((batch_size, n_frames, 3, 64, 64))
 
 
             self.D_s.train()

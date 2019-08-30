@@ -5,8 +5,6 @@ from torch.nn import init
 
 from tensorboardX import SummaryWriter
 
-from Module.Normalization import SpectralNorm
-
 class SeparableAttn(nn.Module):
 
     def __init__(self, in_dim, activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0):

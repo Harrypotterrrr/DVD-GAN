@@ -1,7 +1,7 @@
-from Dataset.datasets.kinetics import Kinetics
-from Dataset.datasets.activitynet import ActivityNet
-from Dataset.datasets.ucf101 import UCF101
-from Dataset.datasets.hmdb51 import HMDB51
+from Dataloader.datasets.kinetics import Kinetics
+from Dataloader.datasets.activitynet import ActivityNet
+from Dataloader.datasets.ucf101 import UCF101
+from Dataloader.datasets.hmdb51 import HMDB51
 
 
 def get_training_set(opt, spatial_transform, temporal_transform,

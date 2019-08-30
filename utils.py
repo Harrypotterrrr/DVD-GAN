@@ -11,7 +11,9 @@ def make_folder(path, version):
 def tensor2var(x, grad=False):
     if torch.cuda.is_available():
         x = x.cuda()
-    return Variable(x, requires_grad=grad)
+
+    x.requires_grad = True
+    return x
 
 def var2tensor(x):
     return x.data.cpu()
