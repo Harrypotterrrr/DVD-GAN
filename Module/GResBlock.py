@@ -10,13 +10,13 @@ class GResBlock(nn.Module):
 
     def __init__(self, in_channel, out_channel, kernel_size=None,
                  padding=1, stride=1, n_class=96, bn=True,
-                 activation=F.relu, upsample_factor=2, downsample_factor=False):
+                 activation=F.relu, upsample_factor=2, downsample_factor=1):
         super().__init__()
 
-        self.upsample_factor = upsample_factor
+        self.upsample_factor = upsample_factor if downsample_factor is 1 else 1
         self.downsample_factor = downsample_factor
         self.activation = activation
-        self.bn = bn
+        self.bn = bn if downsample_factor is 1 else False
 
         if kernel_size is None:
             kernel_size = [3, 3]
@@ -50,36 +50,39 @@ class GResBlock(nn.Module):
 
         out = self.activation(out)
 
-        if self.upsample_factor != 0:
+        if self.upsample_factor != 1:
             # TODO different form papers
-            out = F.interpolate(out, scale_factor=2)
+            out = F.interpolate(out, scale_factor=self.upsample_factor)
 
         out = self.conv0(out)
 
         if self.bn:
-            out = out.view(batch_size * T, -1, W * 2, H * 2)
+            out = out.view(batch_size * T, -1, W * self.upsample_factor, H * self.upsample_factor)
             out = self.CBNorm2(out, condition)
-            # out = out.view(batch_size*T, C, W * 2, H * 2)
 
         out = self.activation(out)
         out = self.conv1(out)
 
-        if self.downsample_factor:
-            out = F.avg_pool2d(out, 2)
+        if self.downsample_factor != 1:
+            out = F.avg_pool2d(out, self.downsample_factor)
 
         if self.skip_proj:
             skip = x
-            if self.upsample_factor != 0:
+            if self.upsample_factor != 1:
                 skip = F.interpolate(skip, scale_factor=self.upsample_factor)
             skip = self.conv_sc(skip)
-            if self.downsample_factor:
-                skip = F.avg_pool2d(skip, 2)
+            if self.downsample_factor != 1:
+                skip = F.avg_pool2d(skip, self.downsample_factor)
 
         else:
             skip = x
 
         y = out + skip
-        y = y.view(batch_size, T, -1, W * 2, H * 2)
+        y = y.view(
+            batch_size, T, -1,
+            W * self.upsample_factor // self.downsample_factor,
+            H * self.upsample_factor // self.downsample_factor
+        )
 
         return y
 
