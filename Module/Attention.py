@@ -7,7 +7,7 @@ from tensorboardX import SummaryWriter
 
 class SeparableAttn(nn.Module):
 
-    def __init__(self, in_dim, activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0):
+    def __init__(self, in_dim, activation=F.relu, pooling_factor=2, padding_mode='constant', padding_value=0):
         super().__init__()
         self.model = nn.Sequential(
             SeparableAttnCell(in_dim, 'T', activation, pooling_factor, padding_mode, padding_value),
@@ -22,7 +22,7 @@ class SeparableAttn(nn.Module):
 
 class SeparableAttnCell(nn.Module):
 
-    def __init__(self, in_dim, attn_id = None, activation=F.relu, pooling_factor=1, padding_mode='constant', padding_value=0):
+    def __init__(self, in_dim, attn_id = None, activation=F.relu, pooling_factor=2, padding_mode='constant', padding_value=0):
         super().__init__()
         self.attn_id = attn_id
         self.activation = activation
@@ -44,8 +44,9 @@ class SeparableAttnCell(nn.Module):
                             kernel_size=1
                         )
 
-        self.pooling = nn.MaxPool3d(kernel_size=pooling_factor)
-        self.pooling_factor = pooling_factor ** 3
+        # only pooling on the first dimension
+        self.pooling = nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(pooling_factor, 1, 1))
+        self.pooling_factor = pooling_factor
 
         self.padding_mode = padding_mode
         self.padding_value = padding_value
@@ -61,40 +62,48 @@ class SeparableAttnCell(nn.Module):
 
     def forward(self, x):
 
-        m_batchsize, C, time, width, height = x.size()
+        batch_size, C, T, W, H = x.size()
 
         # TODO attention space consumption
-        # query = self.query_conv(x).view(m_batchsize, -1, time * width).permute(0, 2, 1)  # B x (TW) x (CH)
+        # query = self.query_conv(x).view(batch_size, -1, T * W).permute(0, 2, 1)  # B x (TW) x (CH)
         #
         # key = self.key_conv(x)  # B x C x T x H x W
-        # key = self.pooling(key).view(m_batchsize, -1, time * height // self.pooling_factor)  # B x (CW) x (TH // 8)
+        # key = self.pooling(key).view(batch_size, -1, T * H // self.pooling_factor)  # B x (CW) x (TH // 8)
         #
-        # if height < width:
-        #     query = F.pad(query, [0, C * (width - height)], self.padding_mode, self.padding_value)
+        # if H < W:
+        #     query = F.pad(query, [0, C * (W - H)], self.padding_mode, self.padding_value)
         # else:
-        #     key = F.pad(key, [0, 0, 0, C * (height - width)], self.padding_mode, self.padding_value)
+        #     key = F.pad(key, [0, 0, 0, C * (H - W)], self.padding_mode, self.padding_value)
 
         if self.attn_id == 'T':
-            attn_dim = time
-        elif self.attn_id == 'H':
-            attn_dim = height
+            attn_dim = T
+            out = x[:]
+        elif self.attn_id == 'W':
+            attn_dim = W
+            out = x.transpose(2, 3)
         else:
-            attn_dim = width
+            attn_dim = H
+            out = x.transpose(2, 4)
 
-        query = self.query_conv(x).view(m_batchsize, attn_dim, -1) # B x T x (WHC)
-        key = self.key_conv(x)  # B x C x T x H x W
-        key = self.pooling(key).view(m_batchsize, -1, attn_dim // self.pooling_factor)  # B x (WHC) x (T // 4)
+        query = self.query_conv(out).view(batch_size, attn_dim, -1) # B x T x (CWH)
+        key = self.key_conv(out)  # B x C x T x H x W
+        key = self.pooling(key).view(batch_size, -1, attn_dim // self.pooling_factor)  # B x (CWH) x (T // pl)
 
 
         dist = torch.bmm(query, key)  # B x T x (T // 4)
         attn_score = self.softmax(dist)  # B x T x (T // 4)
 
-        value = self.value_conv(x)
-        value = self.pooling(value).view(m_batchsize, -1, attn_dim // self.pooling_factor)  # B x (WHC) x (T // 4)
+        value = self.value_conv(out)
+        value = self.pooling(value).view(batch_size, -1, attn_dim // self.pooling_factor)  # B x (CWH) x (T // pl)
 
-        out = torch.bmm(value, attn_score.permute(0, 2, 1))  # B x (WHC) x T
-        out = out.view(m_batchsize, C, width, height, time)
-        out = out.permute(0, 1, 4, 2, 3)
+        out = torch.bmm(value, attn_score.transpose(2, 1))  # B x (CWH) x T
+
+        if self.attn_id == 'T':
+            out = out.view(batch_size, C, W, H, T).permute(0, 1, 4, 2, 3)
+        elif self.attn_id == 'W':
+            out = out.view(batch_size, C, T, H, W).permute(0, 1, 2, 4, 3)
+        elif self.attn_id == 'H':
+            out = out.view(batch_size, C, T, W, H)
 
         out = self.gamma * out + x
         return out
@@ -125,7 +134,7 @@ class SelfAttention(nn.Module):
                             kernel_size=1
                         )
 
-        self.pooling = nn.MaxPool3d(kernel_size=pooling_factor)
+        self.pooling = nn.MaxPool3d(kernel_size=2, stride=pooling_factor)
         self.pooling_factor = pooling_factor ** 3
 
         self.gamma = nn.Parameter(torch.zeros(1))
@@ -142,31 +151,31 @@ class SelfAttention(nn.Module):
     def forward(self, x):
 
         if len(x.size()) == 4:
-            m_batchsize, C, width, height = x.size()
-            time = 1
+            batch_size, C, W, H = x.size()
+            T = 1
         else:
-            m_batchsize, C, time, width, height = x.size()
+            batch_size, C, T, W, H = x.size()
 
-        N = time * width * height
+        N = T * W * H
 
+        query = self.query_conv(x).view(batch_size, -1, N).permute(0, 2, 1)  # B x N x C
 
-        query = self.query_conv(x).view(m_batchsize, -1, N).permute(0, 2, 1)  # B x N x C
+        key = self.key_conv(x)  # B x C x W x H
 
-        key = self.key_conv(x)  # B x C x H x W
-        key = self.pooling(key).view(m_batchsize, -1, N // self.pooling_factor) # B x C x (N // 4)
+        key = self.pooling(key).view(batch_size, -1, N // self.pooling_factor) # B x C x (N // pl)
 
-        dist = torch.bmm(query, key) # B x N x (N // 4)
-        attn_score = self.softmax(dist) # B x N x (N // 4)
+        dist = torch.bmm(query, key) # B x N x (N // pl)
+        attn_score = self.softmax(dist) # B x N x (N // pl)
 
         value = self.value_conv(x)
-        value = self.pooling(value).view(m_batchsize, -1, N // self.pooling_factor)  # B x C x (N // 4)
+        value = self.pooling(value).view(batch_size, -1, N // self.pooling_factor)  # B x C x (N // pl)
 
         out = torch.bmm(value, attn_score.permute(0, 2, 1)) # B x C x N
 
         if len(x.size()) == 4:
-            out = out.view(m_batchsize, C, width, height)
+            out = out.view(batch_size, C, W, H)
         else:
-            out = out.view(m_batchsize, C, time, width, height)
+            out = out.view(batch_size, C, T, W, H)
 
         out = self.gamma * out + x
         return out
@@ -192,7 +201,7 @@ if __name__ == "__main__":
 
     sepa_attn = SeparableAttn(64)
     print(sepa_attn)
-    x = torch.rand(1, 64, 3, 128, 128)
+    x = torch.rand(1, 64, 3, 128, 256)
     y = sepa_attn(x)
     print(x.size())
     print(y.size())
