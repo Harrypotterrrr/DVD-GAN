@@ -8,93 +8,15 @@ from Module.Normalization import ConditionalNorm, SpectralNorm
 from Module.Attention import SelfAttention
 from Module.GResBlock import GResBlock
 
-
-
-class Spectral_Norm:
-    def __init__(self, name):
-        self.name = name
-
-    def compute_weight(self, module):
-        weight = getattr(module, self.name + '_orig')
-        u = getattr(module, self.name + '_u')
-        size = weight.size()
-        weight_mat = weight.contiguous().view(size[0], -1)
-        with torch.no_grad():
-            v = weight_mat.t() @ u
-            v = v / v.norm()
-            u = weight_mat @ v
-            u = u / u.norm()
-        sigma = u @ weight_mat @ v
-        weight_sn = weight / sigma
-        # weight_sn = weight_sn.view(*size)
-
-        return weight_sn, u
-
-    @staticmethod
-    def apply(module, name):
-        fn = Spectral_Norm(name)
-
-        weight = getattr(module, name)
-        del module._parameters[name]
-        module.register_parameter(name + '_orig', weight)
-        input_size = weight.size(0)
-        u = weight.new_empty(input_size).normal_()
-        module.register_buffer(name, weight)
-        module.register_buffer(name + '_u', u)
-
-        module.register_forward_pre_hook(fn)
-
-        return fn
-
-    def __call__(self, module, input):
-        weight_sn, u = self.compute_weight(module)
-        setattr(module, self.name, weight_sn)
-        setattr(module, self.name + '_u', u)
-
-
-def spectral_norm(module, name='weight'):
-    Spectral_Norm.apply(module, name)
-
-    return module
-
-
-def spectral_init(module, gain=1):
-    init.xavier_uniform_(module.weight, gain)
-    if module.bias is not None:
-        module.bias.data.zero_()
-
-    return spectral_norm(module)
-
-
-def init_linear(linear):
-    init.xavier_uniform_(linear.weight)
-    linear.bias.data.zero_()
-
-
-def init_conv(conv, glu=True):
-    init.xavier_uniform_(conv.weight)
-    if conv.bias is not None:
-        conv.bias.data.zero_()
-
-
-def leaky_relu(input):
-    return F.leaky_relu(input, negative_slope=0.2)
-
-
-
 class SpatialDiscriminator(nn.Module):
+
     def __init__(self, chn=128, n_class=3):
         super().__init__()
-
-        self.chn = chn
 
         def conv(in_channel, out_channel, downsample=True):
             return GResBlock(in_channel, out_channel,
                           bn=False,
                           upsample_factor=False, downsample_factor=downsample)
-
-        gain = 2 ** 0.5
-        
 
         self.pre_conv = nn.Sequential(SpectralNorm(nn.Conv2d(3, 2*chn, 3,padding=1),),
                                       nn.ReLU(),
@@ -113,35 +35,32 @@ class SpatialDiscriminator(nn.Module):
 
         self.embed = nn.Embedding(n_class, 16*chn)
         self.embed.weight.data.uniform_(-0.1, 0.1)
-        self.embed = spectral_norm(self.embed)
+        self.embed = SpectralNorm(self.embed)
 
     def forward(self, x, class_id):
         
         # reshape input tensor from BxTxCxHxW to BTxCxHxW
         batch_size, T, C, W, H = x.size()
-        print(x.size())
 
         x = x.view(batch_size*T, C, H, W)
 
         out = self.pre_conv(x)
         out = out + self.pre_skip(F.avg_pool2d(x, 2))
 
-        # reshape back to BxTxCxHxW
+        # reshape back to B x T x C x H x W
 
         out = out.view(batch_size, T, -1, H // 2, W // 2)
 
-        out = self.conv1(out) # BxTxCxHxW
-        out = out.permute(0, 2, 1, 3, 4) # BxCxTxHxW
+        out = self.conv1(out) # B x T x C x H x W
+        out = out.permute(0, 2, 1, 3, 4) # B x C x T x H x W
 
-        out = self.attn(out) # BxCxTxHxW
-        out = out.permute(0, 2, 1, 3, 4).contiguous() # BxTxCxHxW
+        out = self.attn(out) # B x C x T x H x W
+        out = out.permute(0, 2, 1, 3, 4).contiguous() # B x T x C x H x W
 
         out = self.conv2(out)
 
-        print("after conv:", out.size())
-
         out = F.relu(out)
-        out = out.view(batch_size, T, out.size(2), -1)
+        out = out.view(batch_size, T, out.size(2), -1) # B x T x C x H x W
 
         # sum on H and W axis
         out = out.sum(3)
@@ -154,15 +73,7 @@ class SpatialDiscriminator(nn.Module):
 
         prod = (out * embed).sum(1)
 
-
         return out_linear + prod
-
-def sample_k_frames(data, length, n_frame):
-    idx = torch.randint(0, length, n_frame)
-    # idx = torch.LongTensor(random.sample(range(0, length), n_frame)).cuda()
-    idx = idx.sort()
-
-    return data[:, idx[0], :, :, :]
 
 
 def conv3x3x3(in_planes, out_planes, stride=1):
@@ -239,7 +150,7 @@ class TemporalDiscriminator(nn.Module):
 
         self.embed = nn.Embedding(n_class, 16*chn)
         self.embed.weight.data.uniform_(-0.1, 0.1)
-        self.embed = spectral_norm(self.embed)
+        self.embed = SpectralNorm(self.embed)
 
     def forward(self, x, class_id):
 
@@ -319,7 +230,7 @@ def main():
     for i in range(100):
         data = torch.randn((3, 5, 3, 64, 64)).cuda()
 
-        label = torch.randint(0, 3, 3)
+        label = torch.randint(0, 3, (3,))
         # label = torch.cuda.LongTensor(random.sample(range(0,3), 3))
 
         # data = sample_k_frames(data, data.size(1), 3)

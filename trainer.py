@@ -26,6 +26,7 @@ class Trainer(object):
         self.imsize = config.imsize
         self.g_num = config.g_num
         self.z_dim = config.z_dim
+        self.g_chn = config.g_chn
         self.ds_chn = config.ds_chn
         self.dt_chn = config.dt_chn
         self.n_frames = config.n_frames
@@ -46,6 +47,8 @@ class Trainer(object):
         self.beta2 = config.beta2
         self.pretrained_model = config.pretrained_model
 
+        self.n_class = config.n_class
+        self.n_sample = config.n_sample
         self.dataset = config.dataset
         self.use_tensorboard = config.use_tensorboard
         self.image_path = config.image_path
@@ -57,16 +60,13 @@ class Trainer(object):
         self.model_save_step = config.model_save_step
         self.version = config.version
 
-        self.n_class = config.n_class
-        self.chn = config.chn
-
         # Path
         self.log_path = os.path.join(config.log_path, self.version)
         self.sample_path = os.path.join(config.sample_path, self.version)
         self.model_save_path = os.path.join(config.model_save_path, self.version)
 
-        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.device = torch.device('cpu')
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') TODO ADD
+        self.device = torch.device('cpu') # just for test
 
         print('build_model...')
         self.build_model()
@@ -83,11 +83,6 @@ class Trainer(object):
     def label_sampel(self):
         # label = torch.tensor(self.batch_size, dtype=torch.int64)
         label = torch.LongTensor(self.batch_size, 1).random_()%self.n_class
-        print(self.batch_size)
-        print(self.n_class)
-        print(label)
-        print("&&&&&&&&&&&&&&&&&&&&")
-        # exit()
         one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
         return label.squeeze(1).to(self.device), one_hot.to(self.device)       
 
@@ -98,7 +93,7 @@ class Trainer(object):
         # data_iter = iter(self.data_loader) TODO ADD
         # step_per_epoch = len(self.data_loader)
 
-        # model_save_step = int(self.model_save_step * step_per_epoch)
+        # model_save_step = int(self.model_save_step * step_per_epoch) TODO ADD
 
         model_save_step = int(self.model_save_step * 10)
 
@@ -112,7 +107,8 @@ class Trainer(object):
             start = 0
 
         # Start time
-        print('Start   ======  training...')
+        print("=" * 30)
+        print("Start training...")
         start_time = time.time()
         for step in range(start, self.total_step):
 
@@ -151,8 +147,13 @@ class Trainer(object):
             # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
 
             # z_class, z_class_one_hot = self.label_sampel()
- 
+
             fake_videos = self.G(x, class_label)
+            print(len(fake_videos))
+            print(fake_videos[0].size())
+
+            fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample)
+
             ds_out_fake = self.D_s(fake_videos.detach(), class_label)
 
             if self.adv_loss == 'wgan-gp':
@@ -292,12 +293,8 @@ class Trainer(object):
             
 
     def build_model(self):
-        # code_dim=100, n_class=1000
-        # z_dim = 120
-        # n_class = 4
-        # chn = 3
-        # n_frame = 4
-        self.G = Generator(self.z_dim, self.n_class, ch=self.chn, n_frames=self.n_frames).to(self.device)
+
+        self.G = Generator(self.z_dim, self.n_class, ch=self.g_chn, n_frames=self.n_frames).to(self.device)
         self.D_s = SpatialDiscriminator(chn=self.ds_chn, n_class=self.n_class).to(self.device)
         self.D_t = TemporalDiscriminator(chn=self.dt_chn, n_class=self.n_class).to(self.device)
         if self.parallel:
@@ -319,10 +316,11 @@ class Trainer(object):
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr, [self.beta1, self.beta2])
 
         self.c_loss = torch.nn.CrossEntropyLoss()
+
         # print networks
-        print(self.G)
-        print(self.D_s)
-        print(self.D_t)
+        # print(self.G)
+        # print(self.D_s)
+        # print(self.D_t)
 
     def build_tensorboard(self):
         from tensorboardX import SummaryWriter

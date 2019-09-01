@@ -12,7 +12,7 @@ def get_parameters():
     parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge'])
     parser.add_argument('--imsize', type=int, default=128)
     parser.add_argument('--g_num', type=int, default=5)
-    parser.add_argument('--chn', type=int, default=3)
+    parser.add_argument('--g_chn', type=int, default=3)
     parser.add_argument('--z_dim', type=int, default=120)
     parser.add_argument('--n_frames', type=int, default=4)
     parser.add_argument('--ds_chn', type=int, default=128) # SpatialDiscriminator channel
@@ -42,6 +42,8 @@ def get_parameters():
     parser.add_argument('--gpus', type=str, default='0', help='gpuids eg: 0,1,2,3  --parallel True  ')
     parser.add_argument('--dataset', type=str, default='lsun', choices=['lsun', 'celeb','off'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=False)
+    parser.add_argument('--n_class', type=int, default=4)
+    parser.add_argument('--n_sample', type=int, default=8)
 
     # Path
     parser.add_argument('--image_path', type=str, default='./data')
@@ -66,10 +68,5 @@ def get_parameters():
     parser.add_argument('--train_crop', type=str, default='corner') #corner | random | center
     parser.add_argument('--sample_size', type=int, default=64)
     parser.add_argument('--sample_duration', type=int, default=12) # Temporal duration of inputs
-
-
-
-    parser.add_argument('--n_class', type=int, default=3)
-
 
     return parser.parse_args()

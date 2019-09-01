@@ -7,7 +7,6 @@ def make_folder(path, version):
         if not os.path.exists(os.path.join(path, version)):
             os.makedirs(os.path.join(path, version))
 
-
 def tensor2var(x, grad=False):
     if torch.cuda.is_available():
         x = x.cuda()
@@ -40,3 +39,9 @@ def load_value_file(file_path):
         value = float(input_file.read().rstrip('\n\r'))
 
     return value
+
+def sample_k_frames(data, length, n_sample):
+
+    idx = torch.randint(0, length, n_sample)
+    idx = idx.sort()
+    return data[:, idx[0], :, :, :]

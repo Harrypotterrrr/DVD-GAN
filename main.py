@@ -87,11 +87,11 @@ def main(config):
     # The random data is used in the trainer
     # Need to pre-process data and use the dataloader (above)
 
-    config.n_class = len(glob.glob(os.path.join(config.image_path, '*/')))
-    print('number class:', config.n_class)
+    # config.n_class = len(glob.glob(os.path.join(config.image_path, '*/')))
+    # print('number class:', config.n_class) TODO ADD
 
 
-    # Data loader
+    ## Data loader
     # data_loader = Data_Loader(config.train, config.dataset, config.image_path, config.imsize,
     #                          config.batch_size, shuf=config.train)
 
@@ -120,5 +120,8 @@ def main(config):
 
 if __name__ == '__main__':
     config = get_parameters()
-    print(config)
+
+    for key in config.__dict__.keys():
+        print(key, "=", config.__dict__[key])
+
     main(config)
