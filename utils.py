@@ -42,6 +42,6 @@ def load_value_file(file_path):
 
 def sample_k_frames(data, length, n_sample):
 
-    idx = torch.randint(0, length, n_sample)
-    idx = idx.sort()
-    return data[:, idx[0], :, :, :]
+    idx = torch.randint(0, length, (n_sample,))
+    srt, idx = idx.sort()
+    return data[:, srt, :, :, :]

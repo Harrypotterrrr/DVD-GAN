@@ -102,6 +102,8 @@ class Generator(nn.Module):
             frame = self.colorize(frame)
             frame = torch.tanh(frame)
             output.append(frame)
+	
+        output = torch.stack(output, dim=0)
 
         return output
 
@@ -119,4 +121,4 @@ if __name__ == "__main__":
     y = generator(x, class_label)
 
     print(x.size())
-    print(y[-1].size())
+    print(y.size())

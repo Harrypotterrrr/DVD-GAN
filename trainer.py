@@ -68,7 +68,8 @@ class Trainer(object):
         # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') TODO ADD
         self.device = torch.device('cpu') # just for test
 
-        print('build_model...')
+        print("=" * 30)
+        print('Build_model...')
         self.build_model()
 
         if self.use_tensorboard:
@@ -149,8 +150,6 @@ class Trainer(object):
             # z_class, z_class_one_hot = self.label_sampel()
 
             fake_videos = self.G(x, class_label)
-            print(len(fake_videos))
-            print(fake_videos[0].size())
 
             fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample)
 
