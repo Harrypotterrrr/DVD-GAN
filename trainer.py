@@ -16,7 +16,7 @@ class Trainer(object):
     def __init__(self, data_loader, config):
 
         # Data loader
-        # self.data_loader = data_loader
+        self.data_loader = data_loader
 
         # exact model and loss
         self.model = config.model
@@ -65,7 +65,7 @@ class Trainer(object):
         self.sample_path = os.path.join(config.sample_path, self.version)
         self.model_save_path = os.path.join(config.model_save_path, self.version)
 
-        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') TODO ADD
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device = torch.device('cpu') # just for test
 
         print("=" * 30)
@@ -81,22 +81,19 @@ class Trainer(object):
             self.load_pretrained_model()
 
 
-    def label_sampel(self):
+    def label_sample(self):
         # label = torch.tensor(self.batch_size, dtype=torch.int64)
         label = torch.LongTensor(self.batch_size, 1).random_()%self.n_class
         one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
-        return label.squeeze(1).to(self.device), one_hot.to(self.device)       
+        return label.squeeze(1).to(self.device), one_hot.to(self.device)      
 
     def train(self):
 
         # Data iterator
 
-        # data_iter = iter(self.data_loader) TODO ADD
-        # step_per_epoch = len(self.data_loader)
-
-        # model_save_step = int(self.model_save_step * step_per_epoch) TODO ADD
-
-        model_save_step = int(self.model_save_step * 10)
+        data_iter = iter(self.data_loader)
+        step_per_epoch = len(self.data_loader)
+        model_save_step = int(self.model_save_step * step_per_epoch) 
 
         # Fixed input for debugging
         fixed_z = tensor2var(torch.randn(self.batch_size, self.z_dim))
@@ -113,13 +110,13 @@ class Trainer(object):
         start_time = time.time()
         for step in range(start, self.total_step):
 
-            batch_size = 5
-            in_dim = 120
-            n_frames = 4
-            x = torch.randn(batch_size, in_dim)
-            class_label = torch.randint(low=0, high=3, size=(batch_size,))
-            # real_videos = torch.randn((batch_size, n_frames, 3, 64, 64)).cuda() TODO ADD
-            real_videos = torch.randn((batch_size, n_frames, 3, 64, 64))
+            # batch_size = 5
+            # in_dim = 120
+            # n_frames = 4
+            # x = torch.randn(batch_size, in_dim)
+            # class_label = torch.randint(low=0, high=3, size=(batch_size,))
+            # # real_videos = torch.randn((batch_size, n_frames, 3, 64, 64)).to(self.device) TODO ADD
+            # real_videos = torch.randn((batch_size, n_frames, 3, 64, 64))
 
 
             self.D_s.train()
@@ -127,33 +124,45 @@ class Trainer(object):
             self.G.train()
 
             # ================== Train D_s ================== #
-            # try:
-            #     real_images, real_labels = next(data_iter)
-            # except:
-            #     data_iter = iter(self.data_loader)
-            #     real_images, real_labels = next(data_iter)
+            try:
+                real_videos, real_labels = next(data_iter)
+            except:
+                data_iter = iter(self.data_loader)
+                real_videos, real_labels = next(data_iter)
 
-            # # Compute loss with real images
+            # Compute loss with real images
 
-            # real_labels = real_labels.to(self.device)
-            # real_images = real_images.to(self.device)
+            # Data BxCxTxHxW --> BxTxCxHxW
+            real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
 
-            ds_out_real = self.D_s(real_videos, class_label)
+            # print(real_videos.size())
+            # print(real_labels.size())
+            # exit()
+
+            real_labels = real_labels.to(self.device)
+            real_videos = real_videos.to(self.device)
+
+            # print(real_videos.device)
+            # print(real_labels.device)
+            # exit()
+
+            ds_out_real = self.D_s(real_videos, real_labels)
+
             if self.adv_loss == 'wgan-gp':
                 ds_loss_real = - torch.mean(ds_out_real)
             elif self.adv_loss == 'hinge':
                 ds_loss_real = torch.nn.ReLU()(1.0 - ds_out_real).mean()
 
             # apply Gumbel Softmax
-            # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
 
-            # z_class, z_class_one_hot = self.label_sampel()
+            z_class, z_class_one_hot = self.label_sample()
 
-            fake_videos = self.G(x, class_label)
+            fake_videos = self.G(z, z_class)
 
             fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample)
 
-            ds_out_fake = self.D_s(fake_videos.detach(), class_label)
+            ds_out_fake = self.D_s(fake_videos.detach(), z_class)
 
             if self.adv_loss == 'wgan-gp':
                 ds_loss_fake = ds_out_fake.mean()
@@ -205,19 +214,19 @@ class Trainer(object):
             # real_labels = real_labels.to(self.device)
             # real_images = real_images.to(self.device)
 
-            dt_out_real = self.D_t(real_videos, class_label)
+            dt_out_real = self.D_t(real_videos, real_labels)
             if self.adv_loss == 'wgan-gp':
                 dt_loss_real = - torch.mean(dt_out_real)
             elif self.adv_loss == 'hinge':
                 dt_loss_real = torch.nn.ReLU()(1.0 - dt_out_real).mean()
 
             # apply Gumbel Softmax
-            # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
 
-            # z_class, z_class_one_hot = self.label_sampel()
+            z_class, z_class_one_hot = self.label_sample()
  
-            # fake_videos = self.G(z, class_label)
-            d_out_fake = self.D_t(fake_videos.detach(), class_label)
+            fake_videos = self.G(z, z_class)
+            dt_out_fake = self.D_t(fake_videos.detach(), z_class)
 
             if self.adv_loss == 'wgan-gp':
                 dt_loss_fake = dt_out_fake.mean()
@@ -234,14 +243,14 @@ class Trainer(object):
 
             # ================== Train G and gumbel ================== #
             # Create random noise
-            # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-            # z_class, z_class_one_hot = self.label_sampel()
+            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+            z_class, z_class_one_hot = self.label_sample()
             
-            fake_videos = self.G(x, class_label)
+            fake_videos = self.G(z, z_class)
 
             # Compute loss with fake images
-            g_spatial_out_fake = self.D_s(fake_videos, class_label)  # Spatial Discrimminator loss
-            g_temporal_out_fake = self.D_t(fake_videos, class_label) # Temporal Discriminator loss
+            g_spatial_out_fake = self.D_s(fake_videos, z_class)  # Spatial Discrimminator loss
+            g_temporal_out_fake = self.D_t(fake_videos, z_class) # Temporal Discriminator loss
             if self.adv_loss == 'wgan-gp':
                 g_loss_fake = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
             # Same???
@@ -275,11 +284,11 @@ class Trainer(object):
 
             # Sample images
             # Need to rewrite
-            if (step + 1) % self.sample_step == 0:
-                print('Sample images {}_fake.png'.format(step + 1))
-                fake_images= self.G(fixed_z, z_class_one_hot)
-                save_image(denorm(fake_images.data),
-                           os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
+            # if (step + 1) % self.sample_step == 0:
+            #     print('Sample images {}_fake.png'.format(step + 1))
+            #     fake_images= self.G(fixed_z, z_class_one_hot)
+            #     save_image(denorm(fake_images.data),
+            #                os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
 
             if (step+1) % model_save_step==0:
                 torch.save(self.G.state_dict(),
@@ -293,7 +302,7 @@ class Trainer(object):
 
     def build_model(self):
 
-        self.G = Generator(self.z_dim, self.n_class, ch=self.g_chn, n_frames=self.n_frames).to(self.device)
+        self.G = Generator(self.z_dim, n_class=self.n_class, ch=self.g_chn, n_frames=self.n_frames).to(self.device)
         self.D_s = SpatialDiscriminator(chn=self.ds_chn, n_class=self.n_class).to(self.device)
         self.D_t = TemporalDiscriminator(chn=self.dt_chn, n_class=self.n_class).to(self.device)
         if self.parallel:
