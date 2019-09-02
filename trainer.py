@@ -117,7 +117,7 @@ class Trainer(object):
             in_dim = 120
             n_frames = 4
             x = torch.randn(batch_size, in_dim)
-            class_label = torch.randint(low=0, high=3, size=(batch_size,))
+            class_label = torch.randint(low=0, high=self.n_class, size=(batch_size,))
             # real_videos = torch.randn((batch_size, n_frames, 3, 64, 64)).cuda() TODO ADD
             real_videos = torch.randn((batch_size, n_frames, 3, 64, 64))
 
@@ -248,7 +248,7 @@ class Trainer(object):
             elif self.adv_loss == 'hinge':
                 g_loss_fake = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
 
-            self.reset_grad()
+            self.reset_grad() # ?
             g_loss_fake.backward()
             self.g_optimizer.step()
 
