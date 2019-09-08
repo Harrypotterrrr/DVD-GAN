@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
-
 class ConvGRUCell(nn.Module):
     """
     Generate a convolutional GRU cell
     """
 
     def __init__(self, input_size, hidden_size, kernel_size, activation=torch.sigmoid):
+
         super().__init__()
         padding = kernel_size // 2
         self.input_size = input_size
@@ -26,24 +26,26 @@ class ConvGRUCell(nn.Module):
         init.constant_(self.out_gate.bias, 0.)
 
 
-    def forward(self, x, prev_state):
+    def forward(self, x, prev_state=None):
 
-        # get batch and spatial sizes
-        batch_size = x.data.size()[0]
-        spatial_size = x.data.size()[2:]
-
-        # generate empty prev_state, if None is provided
         if prev_state is None:
-            state_size = [batch_size, self.hidden_size] + list(spatial_size)
-            prev_state = torch.zeros(state_size)
 
-            # if torch.cuda.is_available():
-            #     prev_state = torch.zeros(state_size).cuda()
-            # else:
-            #     prev_state = torch.zeros(state_size)
+            # get batch and spatial sizes
+            batch_size = x.data.size()[0]
+            spatial_size = x.data.size()[2:]
+
+            # generate empty prev_state, if None is provided
+            state_size = [batch_size, self.hidden_size] + list(spatial_size)
+            # prev_state = torch.zeros(state_size)
+
+            if torch.cuda.is_available():
+                prev_state = torch.zeros(state_size).cuda()
+            else:
+                prev_state = torch.zeros(state_size)
 
         # data size is [batch, channel, height, width]
         stacked_inputs = torch.cat([x, prev_state], dim=1)
+
         update = self.activation(self.update_gate(stacked_inputs))
         reset = self.activation(self.reset_gate(stacked_inputs))
         out_inputs = torch.tanh(self.out_gate(torch.cat([x, prev_state * reset], dim=1)))
@@ -82,7 +84,8 @@ class ConvGRU(nn.Module):
 
         self.n_layers = n_layers
 
-        cells = []
+        cells = nn.ModuleList()
+
         for i in range(self.n_layers):
             if i == 0:
                 input_dim = self.input_size
@@ -90,10 +93,10 @@ class ConvGRU(nn.Module):
                 input_dim = self.hidden_sizes[i-1]
 
             cell = ConvGRUCell(input_dim, self.hidden_sizes[i], self.kernel_sizes[i])
-            name = 'ConvGRUCell_' + str(i).zfill(2)
-
-            setattr(self, name, cell)
-            cells.append(getattr(self, name))
+            # name = 'ConvGRUCell_' + str(i).zfill(2)
+            # setattr(self, name, cell)
+            # cells.append(getattr(self, name))
+            cells.append(cell)
 
         self.cells = cells
 
@@ -108,25 +111,26 @@ class ConvGRU(nn.Module):
         -------
         upd_hidden : 5D hidden representation. (layer, batch, channels, height, width).
         '''
-        if hidden is None:
-            hidden = [None]*self.n_layers
 
         input_ = x
+        output = []
 
-        upd_hidden = []
+        if hidden is None:
+            hidden = [None] * self.n_layers
 
-        for layer_idx in range(self.n_layers):
-            cell = self.cells[layer_idx]
-            cell_hidden = hidden[layer_idx]
+        for i in range(self.n_layers):
+
+            cell = self.cells[i]
+            cell_hidden = hidden[i]
 
             # pass through layer
-            upd_cell_hidden = cell(input_, cell_hidden)
-            upd_hidden.append(upd_cell_hidden)
+            upd_cell_hidden = cell(input_, cell_hidden) # TODO comment
+            output.append(upd_cell_hidden)
             # update input_ to the last updated hidden layer for next pass
             input_ = upd_cell_hidden
 
         # retain tensors in list to allow different hidden sizes
-        return upd_hidden
+        return output
 
 
 if __name__ == "__main__":
@@ -134,10 +138,14 @@ if __name__ == "__main__":
     # Generate a ConvGRU with 3 cells
     # input_size and hidden_sizes reflect feature map depths.
     # Height and Width are preserved by zero padding within the module.
-    model = ConvGRU(input_size=8, hidden_sizes=[32, 64, 16], kernel_sizes=[3, 5, 3], n_layers=3)
 
-    x = torch.tensor([1, 8, 64, 64], dtype=torch.float32)
-    output = model(x)
+    model = ConvGRU(input_size=8, hidden_sizes=[32, 64, 16], kernel_sizes=[3, 5, 3], n_layers=3).cuda()
+
+    model = nn.DataParallel(model, device_ids=[0, 1])
+
+    x = torch.rand([8, 8, 64, 64], dtype=torch.float32).cuda()
+    hidden_state = None
+    output = model(x, hidden_state)
 
     # output is a list of sequential hidden representation tensors
     print(type(output))  # list
