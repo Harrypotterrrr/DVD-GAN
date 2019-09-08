@@ -32,8 +32,6 @@ class Trainer(object):
         self.n_frames = config.n_frames
         self.g_conv_dim = config.g_conv_dim
         self.d_conv_dim = config.d_conv_dim
-        self.parallel = config.parallel
-        self.gpus = config.gpus
 
         self.lambda_gp = config.lambda_gp
         self.total_step = config.total_step
@@ -65,11 +63,8 @@ class Trainer(object):
         self.sample_path = os.path.join(config.sample_path, self.version)
         self.model_save_path = os.path.join(config.model_save_path, self.version)
 
-        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.device = torch.device('cpu') # just for test
+        self.device, self.parallel, self.gpus = set_device(config)
 
-        print("=" * 30)
-        print('Build_model...')
         self.build_model()
 
         if self.use_tensorboard:
@@ -82,8 +77,7 @@ class Trainer(object):
 
 
     def label_sample(self):
-        # label = torch.tensor(self.batch_size, dtype=torch.int64)
-        label = torch.LongTensor(self.batch_size, 1).random_()%self.n_class
+        label = torch.randint(low=0, high=self.n_class, size=(self.batch_size, 1))
         one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
         return label.squeeze(1).to(self.device), one_hot.to(self.device)      
 
@@ -108,42 +102,23 @@ class Trainer(object):
         print("=" * 30)
         print("Start training...")
         start_time = time.time()
-        for step in range(start, self.total_step):
 
-            # batch_size = 5
-            # in_dim = 120
-            # n_frames = 4
-            # x = torch.randn(batch_size, in_dim)
-            # class_label = torch.randint(low=0, high=3, size=(batch_size,))
-            # # real_videos = torch.randn((batch_size, n_frames, 3, 64, 64)).to(self.device) TODO ADD
-            # real_videos = torch.randn((batch_size, n_frames, 3, 64, 64))
+        for step in range(start, self.total_step):
 
             self.D_s.train()
             self.D_t.train()
             self.G.train()
 
             # ================== Train D_s ================== #
-            try:
-                real_videos, real_labels = next(data_iter)
-            except:
-                data_iter = iter(self.data_loader)
-                real_videos, real_labels = next(data_iter)
+            real_videos, real_labels = next(data_iter)
 
-            # Compute loss with real images
-
-            # Data BxCxTxHxW --> BxTxCxHxW
-            real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
-
-            # print(real_videos.size())
-            # print(real_labels.size())
-            # exit()
 
             real_labels = real_labels.to(self.device)
             real_videos = real_videos.to(self.device)
 
-            # print(real_videos.device)
-            # print(real_labels.device)
-            # exit()
+            # Compute loss with real images
+            # Data BxCxTxHxW --> BxTxCxHxW
+            real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
 
             ds_out_real = self.D_s(real_videos, real_labels)
 
@@ -164,7 +139,8 @@ class Trainer(object):
             ds_out_fake = self.D_s(fake_videos.detach(), z_class)
 
             if self.adv_loss == 'wgan-gp':
-                ds_loss_fake = ds_out_fake.mean()
+                mean = ds_out_fake.mean()
+                ds_loss_fake = mean
             elif self.adv_loss == 'hinge':
                 ds_loss_fake = torch.nn.ReLU()(1.0 + ds_out_fake).mean()
 
@@ -250,6 +226,10 @@ class Trainer(object):
             # Compute loss with fake images
             g_spatial_out_fake = self.D_s(fake_videos, z_class)  # Spatial Discrimminator loss
             g_temporal_out_fake = self.D_t(fake_videos, z_class) # Temporal Discriminator loss
+
+            print(step, "g_tem_out_fake", g_temporal_out_fake.size())
+
+
             if self.adv_loss == 'wgan-gp':
                 g_loss_fake = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
             # Same???
@@ -301,14 +281,17 @@ class Trainer(object):
 
     def build_model(self):
 
-        self.G = Generator(self.z_dim, n_class=self.n_class, ch=self.g_chn, n_frames=self.n_frames).to(self.device)
-        self.D_s = SpatialDiscriminator(chn=self.ds_chn, n_class=self.n_class).to(self.device)
-        self.D_t = TemporalDiscriminator(chn=self.dt_chn, n_class=self.n_class).to(self.device)
+        print("=" * 30, '\nBuild_model...')
+
+        self.G = Generator(self.z_dim, n_class=self.n_class, ch=self.g_chn, n_frames=self.n_frames).cuda()
+        self.D_s = SpatialDiscriminator(chn=self.ds_chn, n_class=self.n_class).cuda()
+        self.D_t = TemporalDiscriminator(chn=self.dt_chn, n_class=self.n_class).cuda()
+
         if self.parallel:
-            print('use parallel...')
-            print('gpuids ', self.gpus)
+            print('Use parallel...')
+            print('gpu:', self.gpus)
             gpus = [int(i) for i in self.gpus.split(',')]
-    
+
             self.G = nn.DataParallel(self.G, device_ids=gpus)
             self.D_s = nn.DataParallel(self.D_s, device_ids=gpus)
             self.D_t = nn.DataParallel(self.D_t, device_ids=gpus)
@@ -318,16 +301,11 @@ class Trainer(object):
 
         # Loss and optimizer
         # self.g_optimizer = torch.optim.Adam(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
-        self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, [self.beta1, self.beta2])
-        self.ds_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_s.parameters()), self.d_lr, [self.beta1, self.beta2])
-        self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr, [self.beta1, self.beta2])
+        self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, (self.beta1, self.beta2))
+        self.ds_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_s.parameters()), self.d_lr, (self.beta1, self.beta2))
+        self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr, (self.beta1, self.beta2))
 
         self.c_loss = torch.nn.CrossEntropyLoss()
-
-        # print networks
-        # print(self.G)
-        # print(self.D_s)
-        # print(self.D_t)
 
     def build_tensorboard(self):
         from tensorboardX import SummaryWriter

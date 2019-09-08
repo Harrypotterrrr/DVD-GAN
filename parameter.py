@@ -1,4 +1,5 @@
 import argparse
+import os
 
 def str2bool(v):
     return v.lower() in ('true')
@@ -14,7 +15,7 @@ def get_parameters():
     parser.add_argument('--g_num', type=int, default=5)
     parser.add_argument('--g_chn', type=int, default=3)
     parser.add_argument('--z_dim', type=int, default=120)
-    parser.add_argument('--n_frames', type=int, default=4)
+    parser.add_argument('--n_frames', type=int, default=24)
     parser.add_argument('--ds_chn', type=int, default=128) # SpatialDiscriminator channel
     parser.add_argument('--dt_chn', type=int, default=128) # TemporalDiscriminator channel
     parser.add_argument('--g_conv_dim', type=int, default=64)
@@ -39,7 +40,7 @@ def get_parameters():
     # Misc
     parser.add_argument('--train', type=str2bool, default=True)
     parser.add_argument('--parallel', type=str2bool, default=False)
-    parser.add_argument('--gpus', type=str, default='0', help='gpuids eg: 0,1,2,3  --parallel True  ')
+    parser.add_argument('--gpus', type=str, default="", help='gpu_id eg: 0,1,2,3 or ""')
     parser.add_argument('--dataset', type=str, default='ucf101', choices=['ucf101', 'kinetics','activitynet', 'hmdb51'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=False)
     parser.add_argument('--n_class', type=int, default=101)
@@ -72,6 +73,5 @@ def get_parameters():
     parser.add_argument('--initial_scale', type=float, default=1.0) 
     parser.add_argument('--n_scales', type=int, default=5)
     parser.add_argument('--scale_step', type=float, default=0.84089641525) 
-
 
     return parser.parse_args()

@@ -57,12 +57,29 @@ class Generator(nn.Module):
 
         y = y.view(-1, 8 * self.ch, self.latent_dim, self.latent_dim) # B x ch x ld x ld
 
+        # if torch.cuda.is_available():
+        #     frame_list = torch.empty((0,)).cuda()  # initialization similar to frame_list = []
+        # else:
+        #     frame_list = torch.empty((0,))
+        #
+        # for i in range(self.n_frames):
+        #     if i == 0:
+        #         frame_list = self.convGRU(y) # T x [B x ch x ld x ld]
+        #     else:
+        #         frame_list = torch.stack((frame_list, self.convGRU(y, frame_list[i-1])))
+        #
+        # frame_hidden_list = torch.empty((0,)).cuda()
+        # for i in frame_list.size()[0]:
+        #     if i == 0:
+        #         frame_hidden_list = 1
+        #     frame_hidden_list.append(i[-1].unsqueeze(0))
+
         frame_list = []
         for i in range(self.n_frames):
             if i == 0:
-                frame_list.append(self.convGRU(y)) # T x [B x ch x ld x ld]
+                frame_list.append(self.convGRU(y))  # T x [B x ch x ld x ld]
             else:
-                frame_list.append(self.convGRU(y, frame_list[i-1]))
+                frame_list.append(self.convGRU(y, frame_list[i - 1]))
 
         frame_hidden_list = []
         for i in frame_list:

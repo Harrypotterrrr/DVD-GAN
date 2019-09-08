@@ -1,11 +1,22 @@
 import os
 import torch
-from torch.autograd import Variable
 from torch.nn import init
 
 def make_folder(path, version):
         if not os.path.exists(os.path.join(path, version)):
             os.makedirs(os.path.join(path, version))
+
+def set_device(config):
+    if config.gpus == "": # cpu
+        return 'cpu', False, ""
+    elif torch.cuda.is_available() is False: # cpu
+        return 'cpu', False, ""
+    elif config.parallel is True and len(config.gpus.split(',')) > 1: # multi gpus
+        os.environ['CUDA_VISIBLE_DEVICES'] = config.gpus
+        return 'cuda', True, config.gpus
+    else: # single gpu
+        os.environ['CUDA_VISIBLE_DEVICES'] = config.gpus
+        return 'cuda:'+config.gpus, False, config.gpus
 
 def tensor2var(x, grad=False):
     if torch.cuda.is_available():

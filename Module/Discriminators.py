@@ -38,7 +38,7 @@ class SpatialDiscriminator(nn.Module):
         self.embed = SpectralNorm(self.embed)
 
     def forward(self, x, class_id):
-        
+
         # reshape input tensor from BxTxCxHxW to BTxCxHxW
         batch_size, T, C, W, H = x.size()
 
@@ -164,103 +164,48 @@ class TemporalDiscriminator(nn.Module):
         x = x.permute(0, 2, 1, 3, 4)
 
         out = self.pre_conv(x)
-        # print(out.size())
-        # print(out.type())
         out = out + self.pre_skip(F.avg_pool3d(x, 2))
-        # print(out.size())
-        # print(out.type())
         out = self.res3d(out) # BxCxTxHxW
-      
-        # out = out.permute(0, 2, 1, 3, 4)
-        # print(out.size())
-        # print(out.type())
-
-        # B, T, C, H, W = out.size()
-        # out = out.view(B*T, C, H, W)
-        # exit()
-
-
-
-        # print(out.size())
         out = self.conv(out)
-        # print(out.size())
-        # print(out.type())
         out = F.relu(out)
-        # print(out.size())
-        # print(out.type())
-        # out = out.view(out.size(0), out.size(1), -1)
         out = out.view(B, T, out.size(1), -1)
-        # print(out.size())
-        # print(out.type())
         # sum on H and W axis
         out = out.sum(3)
-        # print(out.size())
         # sum on T axis
         out = out.sum(1)
-        # print(out.size())
-        # print(out.type())
         out_linear = self.linear(out).squeeze(1)
-        # print(out_linear.size())
-        # print(out_linear.type())
 
-        
         embed = self.embed(class_id)
-        # print(embed.size())
-        # print(embed.type())
 
         prod = (out * embed).sum(1)
 
         return out_linear + prod
 
-def main():
-    # m = torch.randn((3, 5, 1, 1, 1))
-    # n = torch.LongTensor(random.sample(range(0, 4), 2))
-    # l = m[:,n,:,:,:]
 
+if __name__ == '__main__':
 
-    # m = torch.randn(5)
-    # n = m.view(-1, 1)
-    # l = n.repeat(1, 2) # 2 number of repeat
-    # l = l.view(-1)
     model = TemporalDiscriminator()
     model.cuda()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0, 0.9),
-                                               weight_decay=0.00001)
+                                 weight_decay=0.00001)
     for i in range(100):
         data = torch.randn((3, 5, 3, 64, 64)).cuda()
 
         label = torch.randint(0, 3, (3,))
-        # label = torch.cuda.LongTensor(random.sample(range(0,3), 3))
-
-        # data = sample_k_frames(data, data.size(1), 3)
-
         B, T, C, H, W = data.size()
-        data = F.avg_pool2d(data.view(B*T, C, H, W), kernel_size=2)
+        data = F.avg_pool2d(data.view(B * T, C, H, W), kernel_size=2)
         _, _, H, W = data.size()
-        # print(data.size())
-        # print(data.type())
         data = data.view(B, T, C, H, W)
 
-        #transpose to BxCxTxHxW
+        # transpose to BxCxTxHxW
         data = data.transpose(1, 2).contiguous()
 
-
         out = model(data, label)
-
-        # print(out.type())
-        # print(out.size())
-
         loss = torch.mean(out)
-
         print(loss)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-
-if __name__ == '__main__':
-  
-  main()
 

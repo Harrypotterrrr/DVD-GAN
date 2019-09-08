@@ -29,13 +29,13 @@ class SeparableAttnCell(nn.Module):
 
         self.query_conv = nn.Conv3d(
                                 in_channels=in_dim,
-                                out_channels=in_dim // 8,
+                                out_channels=in_dim // 2,
                                 kernel_size=1
                             )
 
         self.key_conv = nn.Conv3d(
                             in_channels=in_dim,
-                            out_channels=in_dim // 8,
+                            out_channels=in_dim // 2,
                             kernel_size=1
                         )
         self.value_conv = nn.Conv3d(
@@ -118,13 +118,13 @@ class SelfAttention(nn.Module):
 
         self.query_conv = nn.Conv3d(
                             in_channels=in_dim,
-                            out_channels=in_dim // 8,
+                            out_channels=in_dim // 2,
                             kernel_size=1
                         )
 
         self.key_conv = nn.Conv3d(
                             in_channels=in_dim,
-                            out_channels=in_dim // 8,
+                            out_channels=in_dim // 2,
                             kernel_size=1
                         )
 

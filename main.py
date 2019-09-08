@@ -1,10 +1,9 @@
-
-from parameter import *
 from trainer import Trainer
 # from tester import Tester
 from data_loader import Data_Loader
 from torch.backends import cudnn
 from utils import make_folder
+from parameter import *
 
 import glob
 import os
@@ -21,9 +20,6 @@ from Dataloader.transform.target_transforms import ClassLabel, VideoID
 from Dataloader.transform.target_transforms import Compose as TargetCompose
 from Dataloader.dataloader import get_training_set, get_validation_set, get_test_set
 from Dataloader.mean import get_mean
-########################################
-
-
 
 
 def main(config):
@@ -60,13 +56,16 @@ def main(config):
         ])
         temporal_transform = TemporalRandomCrop(config.sample_duration)
         target_transform = ClassLabel()
+
+        print("="*30,"\nLoading data...")
         training_data = get_training_set(config, spatial_transform,
                                          temporal_transform, target_transform)
+
         train_loader = torch.utils.data.DataLoader(
             training_data,
             batch_size=config.batch_size,
             shuffle=True,
-            num_workers=config.num_workers,
+            # num_workers=config.num_workers,
             pin_memory=True)
     else:
         spatial_transform = Compose([
@@ -92,8 +91,6 @@ def main(config):
     # Need to pre-process data and use the dataloader (above)
 
     # config.n_class = len(glob.glob(os.path.join(config.root_path, config.video_path)))
-    # print('number class:', config.n_class) TODO ADD
-
 
     ## Data loader
     print('number class:', config.n_class)
@@ -106,9 +103,6 @@ def main(config):
     make_folder(config.sample_path, config.version)
     make_folder(config.log_path, config.version)
     make_folder(config.attn_path, config.version)
-
-
-    print('config data_loader and build logs folder')
 
     if config.train:
         if config.model=='sagan':
