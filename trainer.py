@@ -46,7 +46,7 @@ class Trainer(object):
         self.pretrained_model = config.pretrained_model
 
         self.n_class = config.n_class
-        self.n_sample = config.n_sample
+        self.k_sample = config.k_sample
         self.dataset = config.dataset
         self.use_tensorboard = config.use_tensorboard
         self.image_path = config.image_path
@@ -106,7 +106,12 @@ class Trainer(object):
         for step in range(start, self.total_step):
 
             # ================== Train D_s ================== #
-            real_videos, real_labels = next(data_iter)
+            try:
+                real_videos, real_labels = next(data_iter)
+            except:
+                data_iter = iter(self.data_loader)
+                real_videos, real_labels = next(data_iter)
+
             real_labels = real_labels.to(self.device)
             real_videos = real_videos.to(self.device)
 
@@ -124,9 +129,8 @@ class Trainer(object):
             z = torch.randn(self.batch_size, self.z_dim).to(self.device)
             z_class, z_class_one_hot = self.label_sample()
             fake_videos = self.G(z, z_class)
-            # fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample)
-            fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample) # TODO uncomment
-            ds_out_fake = self.D_s(fake_videos.detach(), z_class) # detach() TODO
+            fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
+            ds_out_fake = self.D_s(fake_videos.detach(), z_class)
 
             if self.adv_loss == 'wgan-gp':
                 ds_loss_fake = ds_out_fake.mean()
@@ -199,7 +203,6 @@ class Trainer(object):
             self.reset_grad()
             g_loss.backward()
             self.g_optimizer.step()
-
 
             # Print out log info
             if (step + 1) % self.log_step == 0:
