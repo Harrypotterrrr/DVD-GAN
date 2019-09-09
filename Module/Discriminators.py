@@ -10,13 +10,8 @@ from Module.GResBlock import GResBlock
 
 class SpatialDiscriminator(nn.Module):
 
-    def __init__(self, chn=128, n_class=3):
+    def __init__(self, chn=128, n_class=4):
         super().__init__()
-
-        def conv(in_channel, out_channel, downsample=True):
-            return GResBlock(in_channel, out_channel,
-                          bn=False,
-                          upsample_factor=False, downsample_factor=downsample)
 
         self.pre_conv = nn.Sequential(SpectralNorm(nn.Conv2d(3, 2*chn, 3,padding=1),),
                                       nn.ReLU(),
@@ -24,12 +19,13 @@ class SpatialDiscriminator(nn.Module):
                                       nn.AvgPool2d(2))
         self.pre_skip = SpectralNorm(nn.Conv2d(3, 2*chn, 1))
 
-        self.conv1 = conv(2*chn, 4*chn, downsample=True)
+        self.conv1 = GResBlock(2*chn, 4*chn, bn=False, downsample_factor=True)
         self.attn = SelfAttention(4*chn)
         self.conv2 = nn.Sequential(
-                        conv(4*chn, 8*chn, downsample=True),    
-                        conv(8*chn, 16*chn, downsample=True),
-                        conv(16*chn, 16*chn, downsample=True))
+                        GResBlock(4*chn, 8*chn, bn=False, downsample_factor=True),
+                        GResBlock(8*chn, 16*chn, bn=False, downsample_factor=True),
+                        GResBlock(16*chn, 16*chn, bn=False, downsample_factor=True)
+        )
 
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
 
@@ -122,29 +118,31 @@ class Res3dBlock(nn.Module):
 
 
 class TemporalDiscriminator(nn.Module):
-    def __init__(self, chn=128, n_class=3):
-        super().__init__()
 
-        def conv(in_channel, out_channel, downsample=True):
-            return GResBlock(in_channel, out_channel,
-                          bn=False,
-                          upsample_factor=False, downsample_factor=downsample)
+    def __init__(self, chn=128, n_class=4):
+
+        super().__init__()
 
         gain = 2 ** 0.5
         
-        self.pre_conv = nn.Sequential(SpectralNorm(nn.Conv3d(3, 2*chn, 3,padding=1),),
-                                      nn.ReLU(),
-                                      SpectralNorm(nn.Conv3d(2*chn, 2*chn, 3,padding=1),),
-                                      nn.AvgPool3d(2))
+        self.pre_conv = nn.Sequential(
+                            SpectralNorm(nn.Conv3d(3, 2*chn, 3, padding=1)),
+                            nn.ReLU(),
+                            SpectralNorm(nn.Conv3d(2*chn, 2*chn, 3, padding=1)),
+                            nn.AvgPool3d(2)
+        )
         self.pre_skip = SpectralNorm(nn.Conv3d(3, 2*chn, 1))
 
 
         self.res3d = Res3dBlock(2*chn, 4*chn, downsample=True)
 
-        self.conv = nn.Sequential(SelfAttention(4*chn),
-                                  conv(4*chn, 8*chn, downsample=True),    
-                                  conv(8*chn, 16*chn, downsample=True),
-                                  conv(16*chn, 16*chn, downsample=True))
+        self.self_attn = SelfAttention(4*chn)
+
+        self.conv = nn.Sequential(
+                            GResBlock(4*chn, 8*chn, bn=False, downsample_factor=2),
+                            GResBlock(8*chn, 16*chn, bn=False, downsample_factor=2),
+                            GResBlock(16*chn, 16*chn, bn=False, downsample_factor=2)
+        )
 
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
 
@@ -158,17 +156,19 @@ class TemporalDiscriminator(nn.Module):
         B, T, C, H, W = x.size()
         x = F.avg_pool2d(x.view(B*T, C, H, W), kernel_size=2)
         _, _, H, W = x.size()
-        x = x.view(B, T, C, H, W)
-
-        #transpose to BxCxTxHxW
-        x = x.permute(0, 2, 1, 3, 4)
+        x = x.view(B, T, C, H, W).transpose(2, 1) # B x C x T x W x H
 
         out = self.pre_conv(x)
         out = out + self.pre_skip(F.avg_pool3d(x, 2))
-        out = self.res3d(out) # BxCxTxHxW
+        out = self.res3d(out) # B x C x T x H x W
+
+        out = self.self_attn(out)
+        out = out.transpose(2, 1).contiguous() # B x T x C x W x H
+
         out = self.conv(out)
         out = F.relu(out)
-        out = out.view(B, T, out.size(1), -1)
+
+        out = out.view(B, T, out.size(2), -1) # B x T x C x (WH)
         # sum on H and W axis
         out = out.sum(3)
         # sum on T axis
@@ -184,26 +184,31 @@ class TemporalDiscriminator(nn.Module):
 
 if __name__ == '__main__':
 
-    model = TemporalDiscriminator()
+    batch_size = 6
+    n_frames = 8
+    n_class = 4
+    n_chn = 4
+
+    model = TemporalDiscriminator(chn=n_chn, n_class=n_class)
     model.cuda()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0, 0.9),
                                  weight_decay=0.00001)
     for i in range(100):
-        data = torch.randn((3, 5, 3, 64, 64)).cuda()
+        data = torch.randn((batch_size, n_frames, 3, 64, 64)).cuda()
 
-        label = torch.randint(0, 3, (3,))
-        B, T, C, H, W = data.size()
-        data = F.avg_pool2d(data.view(B * T, C, H, W), kernel_size=2)
-        _, _, H, W = data.size()
-        data = data.view(B, T, C, H, W)
+        label = torch.randint(0, n_class, (batch_size,)).cuda()
+        # B, T, C, H, W = data.size()
+        # data = F.avg_pool2d(data.view(B * T, C, H, W), kernel_size=2)
+        # _, _, H, W = data.size()
+        # data = data.view(B, T, C, H, W)
 
-        # transpose to BxCxTxHxW
-        data = data.transpose(1, 2).contiguous()
+        # # transpose to BxCxTxHxW
+        # data = data.transpose(1, 2).contiguous()
 
         out = model(data, label)
         loss = torch.mean(out)
-        print(loss)
+        print(loss.data)
 
         optimizer.zero_grad()
         loss.backward()
