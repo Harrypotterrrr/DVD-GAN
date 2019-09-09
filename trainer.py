@@ -96,7 +96,6 @@ class Trainer(object):
             start = 0
 
         # Start time
-        print()
         print("=" * 30, "\nStart training...")
         start_time = time.time()
 
@@ -114,7 +113,6 @@ class Trainer(object):
             # Compute loss with real images
             # Data BxCxTxHxW --> BxTxCxHxW
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
-            print("456",real_videos.size())
             ds_out_real = self.D_s(real_videos, real_labels)
 
             if self.adv_loss == 'wgan-gp':
@@ -125,10 +123,9 @@ class Trainer(object):
             # apply Gumbel Softmax
             z = torch.randn(self.batch_size, self.z_dim).to(self.device)
             z_class, z_class_one_hot = self.label_sample()
-            print("z", z.size(), z_class.size())
             fake_videos = self.G(z, z_class)
-            fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample)
-            print("123", fake_videos.size())
+            # fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample)
+            fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample) # TODO uncomment
             ds_out_fake = self.D_s(fake_videos.detach(), z_class) # detach() TODO
 
             if self.adv_loss == 'wgan-gp':
@@ -175,11 +172,6 @@ class Trainer(object):
             elif self.adv_loss == 'hinge':
                 dt_loss_real = torch.nn.ReLU()(1.0 - dt_out_real).mean()
 
-            # # apply Gumbel Softmax
-            # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-            # z_class, z_class_one_hot = self.label_sample()
-            #
-            # fake_videos = self.G(z, z_class)
             dt_out_fake = self.D_t(fake_videos.detach(), z_class)
 
             if self.adv_loss == 'wgan-gp':
@@ -187,33 +179,25 @@ class Trainer(object):
             elif self.adv_loss == 'hinge':
                 dt_loss_fake = torch.nn.ReLU()(1.0 + dt_out_fake).mean()
 
-
             # Backward + Optimize
             dt_loss = dt_loss_real + dt_loss_fake
             self.reset_grad()
             dt_loss.backward()
             self.dt_optimizer.step()
 
-
             # ================== Train G and gumbel ================== #
-            # Create random noise
-            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-            z_class, z_class_one_hot = self.label_sample()
-            
-            fake_videos = self.G(z, z_class)
 
             # Compute loss with fake images
             g_spatial_out_fake = self.D_s(fake_videos, z_class)  # Spatial Discrimminator loss
             g_temporal_out_fake = self.D_t(fake_videos, z_class) # Temporal Discriminator loss
 
             if self.adv_loss == 'wgan-gp':
-                g_loss_fake = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
-            # Same???
+                g_loss = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
             elif self.adv_loss == 'hinge':
-                g_loss_fake = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
+                g_loss = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
 
-            self.reset_grad() # ?
-            g_loss_fake.backward()
+            self.reset_grad()
+            g_loss.backward()
             self.g_optimizer.step()
 
 
@@ -221,21 +205,17 @@ class Trainer(object):
             if (step + 1) % self.log_step == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
-                print("Elapsed [{}], G_step [{}/{}], D_step[{}/{}], d_out_real: {:.4f}, d_out_fake: {:.4f}, g_loss_fake: {:.4f}".
-                      format(elapsed, step + 1, self.total_step, (step + 1),
-                             self.total_step , d_loss_real.item(), d_loss_fake.item(), g_loss_fake.item()))
-                
-                if self.use_tensorboard:
-                    self.writer.add_scalar('data/ds_loss_real', ds_loss_real.item(),(step + 1))
-                    self.writer.add_scalar('data/ds_loss_fake', ds_loss_fake.item(),(step + 1))
-                    self.writer.add_scalar('data/ds_loss', ds_loss.item(), (step + 1))
+                start_time = time.time()
+                # print("Elapsed [{}], G_step [{}/{}], D_step[{}/{}], d_out_real: {:.4f}, d_out_fake: {:.4f}, g_loss_fake: {:.4f}".
+                #       format(elapsed, step + 1, self.total_step, (step + 1),
+                #              self.total_step , d_loss_real.item(), d_loss_fake.item(), g_loss_fake.item()))
+                print(
+                    "Step: [%d/%d], time: %s, ds_loss: %.4f, dt_loss: %.4f, g_loss: %.4f" %
+                    (step + 1, self.total_step, elapsed, ds_loss, dt_loss, g_loss)
+                )
 
-                    self.writer.add_scalar('data/dt_loss_real', dt_loss_real.item(),(step + 1))
-                    self.writer.add_scalar('data/dt_loss_fake', dt_loss_fake.item(),(step + 1))
-                    self.writer.add_scalar('data/dt_loss', dt_loss.item(), (step + 1))
-
-                    self.writer.add_scalar('data/g_loss_fake', g_loss_fake.item(), (step + 1))
-
+                if self.use_tensorboard is True:
+                    write_log(self.writer, step + 1, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
 
             # Sample images
             # Need to rewrite
