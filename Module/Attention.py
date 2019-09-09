@@ -51,7 +51,7 @@ class SeparableAttnCell(nn.Module):
         self.padding_mode = padding_mode
         self.padding_value = padding_value
 
-        self.gamma = nn.Parameter(torch.zeros(1))
+        self.gamma = nn.Parameter(torch.zeros((1,)))
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -63,6 +63,8 @@ class SeparableAttnCell(nn.Module):
     def forward(self, x):
 
         batch_size, C, T, W, H = x.size()
+
+        assert T % 2 == 0 and W % 2 == 0 and  H % 2 == 0, "T, W, H is not even"
 
         # TODO attention space consumption
         # query = self.query_conv(x).view(batch_size, -1, T * W).permute(0, 2, 1)  # B x (TW) x (CH)
@@ -155,6 +157,8 @@ class SelfAttention(nn.Module):
             T = 1
         else:
             batch_size, C, T, W, H = x.size()
+
+        assert T % 2 == 0 and W % 2 == 0 and  H % 2 == 0, "T, W, H is not even"
 
         N = T * W * H
 

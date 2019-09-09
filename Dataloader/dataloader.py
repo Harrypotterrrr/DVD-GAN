@@ -58,7 +58,7 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
     elif opt.dataset == 'activitynet':
         validation_data = ActivityNet(
             opt.video_path,
@@ -69,7 +69,7 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
     elif opt.dataset == 'ucf101':
         validation_data = UCF101(
             opt.video_path,
@@ -79,7 +79,7 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
     elif opt.dataset == 'hmdb51':
         validation_data = HMDB51(
             opt.video_path,
@@ -89,7 +89,7 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
     return validation_data
 
 
@@ -110,7 +110,7 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform):
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
     elif opt.dataset == 'activitynet':
         test_data = ActivityNet(
             opt.video_path,
@@ -121,7 +121,7 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform):
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
     elif opt.dataset == 'ucf101':
         test_data = UCF101(
             opt.video_path,
@@ -131,7 +131,7 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform):
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
     elif opt.dataset == 'hmdb51':
         test_data = HMDB51(
             opt.video_path,
@@ -141,6 +141,6 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform):
             spatial_transform,
             temporal_transform,
             target_transform,
-            sample_duration=opt.sample_duration)
+            sample_duration=opt.n_frames)
 
     return test_data

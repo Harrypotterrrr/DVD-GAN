@@ -54,7 +54,7 @@ def main(config):
             RandomHorizontalFlip(),
             ToTensor(config.norm_value), norm_method
         ])
-        temporal_transform = TemporalRandomCrop(config.sample_duration)
+        temporal_transform = TemporalRandomCrop(config.n_frames)
         target_transform = ClassLabel()
 
         print("="*30,"\nLoading data...")
@@ -73,7 +73,7 @@ def main(config):
             CenterCrop(config.sample_size),
             ToTensor(config.norm_value), norm_method
         ])
-        temporal_transform = LoopPadding(config.sample_duration)
+        temporal_transform = LoopPadding(config.n_frames)
         target_transform = ClassLabel()
         validation_data = get_validation_set(
             config, spatial_transform, temporal_transform, target_transform)
