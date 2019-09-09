@@ -32,7 +32,7 @@ def main(config):
     config.mean = get_mean(config.norm_value, dataset=config.mean_dataset)
 
     if config.no_mean_norm and not config.std_norm:
-        norm_method = Normalize([0, 0, 0], [1, 1, 1])
+        norm_method = Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     elif not config.std_norm:
         norm_method = Normalize(config.mean, [1, 1, 1])
 

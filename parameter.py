@@ -24,7 +24,7 @@ def get_parameters():
 
     # Training setting
     parser.add_argument('--total_step', type=int, default=1000000, help='how many times to update the generator')
-    parser.add_argument('--d_iters', type=float, default=5)
+    parser.add_argument('--d_iters', type=float, default=2)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=12)
     parser.add_argument('--g_lr', type=float, default=0.0001)
@@ -55,12 +55,12 @@ def get_parameters():
 
     # Step size
     parser.add_argument('--log_step', type=int, default=10)
-    parser.add_argument('--sample_step', type=int, default=20)
+    parser.add_argument('--sample_step', type=int, default=200)
     parser.add_argument('--model_save_step', type=float, default=1.0)
 
     # Dataloader
-    parser.add_argument('--norm_value', type=int, default=1)
-    parser.add_argument('--no_mean_norm', action='store_true', default=False)
+    parser.add_argument('--norm_value', type=int, default=255)
+    parser.add_argument('--no_mean_norm', action='store_true', default=True)
     parser.add_argument('--std_norm', action='store_true', default=False)
     parser.add_argument('--mean_dataset', type=str, default='activitynet')
     parser.add_argument('--root_path', type=str, default='/tmp4/potter/UCF101')
