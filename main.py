@@ -102,7 +102,6 @@ def main(config):
     make_folder(config.model_save_path, config.version)
     make_folder(config.sample_path, config.version)
     make_folder(config.log_path, config.version)
-    make_folder(config.attn_path, config.version)
 
     if config.train:
         if config.model=='sagan':
