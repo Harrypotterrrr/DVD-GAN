@@ -89,9 +89,6 @@ class Trainer(object):
         step_per_epoch = len(self.data_loader)
         model_save_step = int(self.model_save_step * step_per_epoch) 
 
-        # Fixed input for debugging
-        fixed_z = tensor2var(torch.randn(self.batch_size, self.z_dim))
-
         # Start with trained model
         if self.pretrained_model:
             start = self.pretrained_model + 1
@@ -99,27 +96,25 @@ class Trainer(object):
             start = 0
 
         # Start time
-        print("=" * 30)
-        print("Start training...")
+        print()
+        print("=" * 30, "\nStart training...")
         start_time = time.time()
+
+        self.D_s.train()
+        self.D_t.train()
+        self.G.train()
 
         for step in range(start, self.total_step):
 
-            self.D_s.train()
-            self.D_t.train()
-            self.G.train()
-
             # ================== Train D_s ================== #
             real_videos, real_labels = next(data_iter)
-
-
             real_labels = real_labels.to(self.device)
             real_videos = real_videos.to(self.device)
 
             # Compute loss with real images
             # Data BxCxTxHxW --> BxTxCxHxW
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
-
+            print("456",real_videos.size())
             ds_out_real = self.D_s(real_videos, real_labels)
 
             if self.adv_loss == 'wgan-gp':
@@ -129,28 +124,23 @@ class Trainer(object):
 
             # apply Gumbel Softmax
             z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-
             z_class, z_class_one_hot = self.label_sample()
-
+            print("z", z.size(), z_class.size())
             fake_videos = self.G(z, z_class)
-
             fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.n_sample)
-
-            ds_out_fake = self.D_s(fake_videos.detach(), z_class)
+            print("123", fake_videos.size())
+            ds_out_fake = self.D_s(fake_videos.detach(), z_class) # detach() TODO
 
             if self.adv_loss == 'wgan-gp':
-                mean = ds_out_fake.mean()
-                ds_loss_fake = mean
+                ds_loss_fake = ds_out_fake.mean()
             elif self.adv_loss == 'hinge':
                 ds_loss_fake = torch.nn.ReLU()(1.0 + ds_out_fake).mean()
-
 
             # Backward + Optimize
             ds_loss = ds_loss_real + ds_loss_fake
             self.reset_grad()
             ds_loss.backward()
             self.ds_optimizer.step()
-
 
             # if self.adv_loss == 'wgan-gp':
             #     # Compute gradient penalty
@@ -178,16 +168,6 @@ class Trainer(object):
 
 
             # ================== Train D_t ================== #
-            # try:
-            #     real_images, real_labels = next(data_iter)
-            # except:
-            #     data_iter = iter(self.data_loader)
-            #     real_images, real_labels = next(data_iter)
-
-            # # Compute loss with real images
-
-            # real_labels = real_labels.to(self.device)
-            # real_images = real_images.to(self.device)
 
             dt_out_real = self.D_t(real_videos, real_labels)
             if self.adv_loss == 'wgan-gp':
@@ -195,12 +175,11 @@ class Trainer(object):
             elif self.adv_loss == 'hinge':
                 dt_loss_real = torch.nn.ReLU()(1.0 - dt_out_real).mean()
 
-            # apply Gumbel Softmax
-            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-
-            z_class, z_class_one_hot = self.label_sample()
- 
-            fake_videos = self.G(z, z_class)
+            # # apply Gumbel Softmax
+            # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+            # z_class, z_class_one_hot = self.label_sample()
+            #
+            # fake_videos = self.G(z, z_class)
             dt_out_fake = self.D_t(fake_videos.detach(), z_class)
 
             if self.adv_loss == 'wgan-gp':
@@ -226,9 +205,6 @@ class Trainer(object):
             # Compute loss with fake images
             g_spatial_out_fake = self.D_s(fake_videos, z_class)  # Spatial Discrimminator loss
             g_temporal_out_fake = self.D_t(fake_videos, z_class) # Temporal Discriminator loss
-
-            print(step, "g_tem_out_fake", g_temporal_out_fake.size())
-
 
             if self.adv_loss == 'wgan-gp':
                 g_loss_fake = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()

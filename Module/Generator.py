@@ -1,5 +1,5 @@
 import torch
-from torch import nn
+import torch.nn as nn
 from torch.nn import functional as F
 
 from tensorboardX import SummaryWriter
@@ -120,7 +120,8 @@ class Generator(nn.Module):
             frame = torch.tanh(frame)
             output.append(frame)
 	
-        output = torch.stack(output, dim=0)
+        output = torch.stack(output, dim=0) # T x B x C x W x H
+        output = output.transpose(1, 0).contiguous() # B x T x C x W x H
 
         return output
 
@@ -132,9 +133,9 @@ if __name__ == "__main__":
     n_class = 4
     n_frames = 4
 
-    x = torch.randn(batch_size, in_dim)
-    class_label = torch.randint(low=0, high=3, size=(batch_size,))
-    generator = Generator(in_dim, n_class=n_class, ch=3, n_frames=n_frames)
+    x = torch.randn(batch_size, in_dim).cuda()
+    class_label = torch.randint(low=0, high=3, size=(batch_size,)).cuda()
+    generator = Generator(in_dim, n_class=n_class, ch=3, n_frames=n_frames).cuda()
     y = generator(x, class_label)
 
     print(x.size())

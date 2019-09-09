@@ -65,7 +65,7 @@ def main(config):
             training_data,
             batch_size=config.batch_size,
             shuffle=True,
-            # num_workers=config.num_workers,
+            num_workers=config.num_workers,
             pin_memory=True)
     else:
         spatial_transform = Compose([
