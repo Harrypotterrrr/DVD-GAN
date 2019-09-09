@@ -87,7 +87,9 @@ class Trainer(object):
 
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
-        model_save_step = int(self.model_save_step * step_per_epoch) 
+        model_save_step = int(self.model_save_step * step_per_epoch)
+
+        fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
 
         # Start with trained model
         if self.pretrained_model:
@@ -219,11 +221,13 @@ class Trainer(object):
 
             # Sample images
             # Need to rewrite
-            # if (step + 1) % self.sample_step == 0:
-            #     print('Sample images {}_fake.png'.format(step + 1))
-            #     fake_images= self.G(fixed_z, z_class_one_hot)
-            #     save_image(denorm(fake_images.data),
-            #                os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
+            if (step + 1) % self.sample_step == 0:
+                print('Sample images {}_fake.png'.format(step + 1))
+                fake_videos = self.G(fixed_z, z_class_one_hot)
+                
+                for i in range(fake_videos.size()):
+                    save_image(denorm(fake_videos[i].data),
+                               os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step + 1, i + 1)))
 
             if (step+1) % model_save_step==0:
                 torch.save(self.G.state_dict(),
