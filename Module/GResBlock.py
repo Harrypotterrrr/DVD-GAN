@@ -91,12 +91,12 @@ if __name__ == "__main__":
 
     n_class = 96
     batch_size = 4
-    n_frame = 20
+    n_frames = 20
 
     gResBlock = GResBlock(3, 100, [3, 3])
-    x = torch.rand([batch_size, n_frame, 3, 64, 64])
+    x = torch.rand([batch_size, n_frames, 3, 64, 64])
     condition = torch.rand([batch_size, n_class])
-    condition = condition.repeat(n_frame, 1)
+    condition = condition.repeat(n_frames, 1)
     y = gResBlock(x, condition)
     print(gResBlock)
     print(x.size())

@@ -15,9 +15,8 @@ def get_parameters():
     parser.add_argument('--g_num', type=int, default=5)
     parser.add_argument('--g_chn', type=int, default=3)
     parser.add_argument('--z_dim', type=int, default=120)
-    parser.add_argument('--n_frames', type=int, default=24)
-    parser.add_argument('--ds_chn', type=int, default=128) # SpatialDiscriminator channel
-    parser.add_argument('--dt_chn', type=int, default=128) # TemporalDiscriminator channel
+    parser.add_argument('--ds_chn', type=int, default=32) # SpatialDiscriminator channel
+    parser.add_argument('--dt_chn', type=int, default=32) # TemporalDiscriminator channel
     parser.add_argument('--g_conv_dim', type=int, default=64)
     parser.add_argument('--d_conv_dim', type=int, default=64)
     parser.add_argument('--lambda_gp', type=float, default=10)
@@ -26,7 +25,7 @@ def get_parameters():
     # Training setting
     parser.add_argument('--total_step', type=int, default=1000000, help='how many times to update the generator')
     parser.add_argument('--d_iters', type=float, default=5)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=12)
     parser.add_argument('--g_lr', type=float, default=0.0001)
     parser.add_argument('--d_lr', type=float, default=0.0004)
@@ -44,7 +43,8 @@ def get_parameters():
     parser.add_argument('--dataset', type=str, default='ucf101', choices=['ucf101', 'kinetics','activitynet', 'hmdb51'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=False)
     parser.add_argument('--n_class', type=int, default=101)
-    parser.add_argument('--n_sample', type=int, default=8)
+    parser.add_argument('--k_sample', type=int, default=8)
+    parser.add_argument('--n_frames', type=int, default=24)
 
     # Path
     parser.add_argument('--image_path', type=str, default='./data')
@@ -68,7 +68,6 @@ def get_parameters():
     parser.add_argument('--annotation_path', type=str, default='annotation/ucf101_01.json')
     parser.add_argument('--train_crop', type=str, default='corner') #corner | random | center
     parser.add_argument('--sample_size', type=int, default=64)
-    parser.add_argument('--sample_duration', type=int, default=12) # Temporal duration of inputs
 
     parser.add_argument('--initial_scale', type=float, default=1.0) 
     parser.add_argument('--n_scales', type=int, default=5)
