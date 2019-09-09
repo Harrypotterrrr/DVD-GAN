@@ -75,6 +75,7 @@ class Trainer(object):
 
     def label_sample(self):
         label = torch.randint(low=0, high=self.n_class, size=(self.batch_size, 1))
+        # label = torch.LongTensor(self.batch_size, 1).random_()%self.n_class
         one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
         return label.squeeze(1).to(self.device), one_hot.to(self.device)      
 
@@ -119,6 +120,7 @@ class Trainer(object):
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
             ds_out_real = self.D_s(real_videos, real_labels)
 
+
             if self.adv_loss == 'wgan-gp':
                 ds_loss_real = - torch.mean(ds_out_real)
             elif self.adv_loss == 'hinge':
@@ -131,10 +133,12 @@ class Trainer(object):
             fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
             ds_out_fake = self.D_s(fake_videos.detach(), z_class)
 
+
             if self.adv_loss == 'wgan-gp':
                 ds_loss_fake = ds_out_fake.mean()
             elif self.adv_loss == 'hinge':
                 ds_loss_fake = torch.nn.ReLU()(1.0 + ds_out_fake).mean()
+
 
             # Backward + Optimize
             ds_loss = ds_loss_real + ds_loss_fake
