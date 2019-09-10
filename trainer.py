@@ -1,11 +1,8 @@
-
-import os
 import time
 import torch
 import datetime
 
 import torch.nn as nn
-from torch.autograd import Variable
 from torchvision.utils import save_image
 
 from Module.Generator import Generator
@@ -229,9 +226,9 @@ class Trainer(object):
             # Sample images
             # Need to rewrite
             if (step + 1) % self.sample_step == 0:
-                print('Sample images {}_fake.png'.format(step + 1))
+                print('Saved sample images {}_fake.png'.format(step + 1))
                 fake_videos = self.G(fixed_z, z_class)
-                
+
                 for i in range(fake_videos.size(0)):
                     save_image(denorm(fake_videos[i].data),
                                os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step + 1, i + 1)))
