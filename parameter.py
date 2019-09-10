@@ -1,5 +1,4 @@
 import argparse
-import os
 
 def str2bool(v):
     return v.lower() in ('true')
@@ -39,14 +38,14 @@ def get_parameters():
     # Misc
     parser.add_argument('--train', type=str2bool, default=True)
     parser.add_argument('--parallel', type=str2bool, default=False)
-    parser.add_argument('--gpus', type=str, default="", help='gpu_id eg: 0,1,2,3 or ""')
+    parser.add_argument('-g', '--gpus', default=[], nargs='+', type=str, help='Specify GPU ids.')
     parser.add_argument('--dataset', type=str, default='ucf101', choices=['ucf101', 'kinetics','activitynet', 'hmdb51'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=False)
     parser.add_argument('--n_class', type=int, default=10)
     parser.add_argument('--k_sample', type=int, default=8)
     parser.add_argument('--n_frames', type=int, default=24)
 
-    # Path
+    # Pathl
     parser.add_argument('--image_path', type=str, default='./data')
     parser.add_argument('--log_path', type=str, default='./logs')
     parser.add_argument('--model_save_path', type=str, default='./models')
@@ -70,6 +69,8 @@ def get_parameters():
 
     parser.add_argument('--initial_scale', type=float, default=1.0) 
     parser.add_argument('--n_scales', type=int, default=5)
-    parser.add_argument('--scale_step', type=float, default=0.84089641525) 
+    parser.add_argument('--scale_step', type=float, default=0.84089641525)
 
-    return parser.parse_args()
+    config = parser.parse_args()
+
+    return config

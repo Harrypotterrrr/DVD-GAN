@@ -61,6 +61,7 @@ class Trainer(object):
         self.model_save_path = os.path.join(config.model_save_path, self.version)
 
         self.device, self.parallel, self.gpus = set_device(config)
+        # self.device, self.parallel, self.gpus = 'cuda', True, '4,5,6,7'
 
         self.build_model()
 
@@ -130,6 +131,7 @@ class Trainer(object):
             z = torch.randn(self.batch_size, self.z_dim).to(self.device)
             z_class, z_class_one_hot = self.label_sample()
             fake_videos = self.G(z, z_class)
+
             fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
             ds_out_fake = self.D_s(fake_videos.detach(), z_class)
 
@@ -246,6 +248,8 @@ class Trainer(object):
     def build_model(self):
 
         print("=" * 30, '\nBuild_model...')
+        import os
+        print(os.environ["CUDA_VISIBLE_DEVICES"])
 
         self.G = Generator(self.z_dim, n_class=self.n_class, ch=self.g_chn, n_frames=self.n_frames).cuda()
         self.D_s = SpatialDiscriminator(chn=self.ds_chn, n_class=self.n_class).cuda()
@@ -253,18 +257,16 @@ class Trainer(object):
 
         if self.parallel:
             print('Use parallel...')
-            print('gpu:', self.gpus)
-            gpus = [int(i) for i in self.gpus.split(',')]
-
-            self.G = nn.DataParallel(self.G, device_ids=gpus)
-            self.D_s = nn.DataParallel(self.D_s, device_ids=gpus)
-            self.D_t = nn.DataParallel(self.D_t, device_ids=gpus)
+            print('gpus:', list(range(len(self.gpus))))
+            # gpus = [int(i) for i in self.gpus.split(',')]
+            self.G = nn.DataParallel(self.G, device_ids=list(range(len(self.gpus))))
+            self.D_s = nn.DataParallel(self.D_s, device_ids=list(range(len(self.gpus))))
+            self.D_t = nn.DataParallel(self.D_t, device_ids=list(range(len(self.gpus))))
 
         # self.G.apply(weights_init)
         # self.D.apply(weights_init)
 
         # Loss and optimizer
-        # self.g_optimizer = torch.optim.Adam(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, (self.beta1, self.beta2))
         self.ds_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_s.parameters()), self.d_lr, (self.beta1, self.beta2))
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr, (self.beta1, self.beta2))

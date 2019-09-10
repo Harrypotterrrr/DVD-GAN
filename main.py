@@ -5,7 +5,6 @@ from torch.backends import cudnn
 from utils import make_folder
 from parameter import *
 
-import glob
 import os
 import torch
 
@@ -115,6 +114,7 @@ def main(config):
     else:
         tester = Tester(val_loader, config)
         tester.test()
+
 
 if __name__ == '__main__':
     config = get_parameters()
