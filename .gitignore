@@ -5,3 +5,4 @@ logs/
 _cache_*
 test.py
 models/
+samples/

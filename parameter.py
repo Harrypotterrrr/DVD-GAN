@@ -42,7 +42,7 @@ def get_parameters():
     parser.add_argument('--gpus', type=str, default="", help='gpu_id eg: 0,1,2,3 or ""')
     parser.add_argument('--dataset', type=str, default='ucf101', choices=['ucf101', 'kinetics','activitynet', 'hmdb51'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=False)
-    parser.add_argument('--n_class', type=int, default=101)
+    parser.add_argument('--n_class', type=int, default=10)
     parser.add_argument('--k_sample', type=int, default=8)
     parser.add_argument('--n_frames', type=int, default=24)
 
