@@ -7,16 +7,22 @@ def make_folder(path, version):
             os.makedirs(os.path.join(path, version))
 
 def set_device(config):
+
     if config.gpus == "": # cpu
         return 'cpu', False, ""
-    elif torch.cuda.is_available() is False: # cpu
-        return 'cpu', False, ""
-    elif config.parallel is True and len(config.gpus.split(',')) > 1: # multi gpus
-        os.environ['CUDA_VISIBLE_DEVICES'] = config.gpus
-        return 'cuda', True, config.gpus
-    else: # single gpu
-        os.environ['CUDA_VISIBLE_DEVICES'] = config.gpus
-        return 'cuda:'+config.gpus, False, config.gpus
+    else:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(config.gpus)
+
+        if torch.cuda.is_available() is False: # cpu
+            return 'cpu', False, ""
+        else:
+            # gpus = config.gpus.split(',')
+            # gpus = (',').join(list(map(str, range(0, len(gpus))))) # generate a list of string number from 0 to len(config.gpus)
+            gpus = list(range(len(config.gpus)))
+            if config.parallel is True and len(gpus) > 1: # multi gpus
+                return 'cuda', True, gpus
+            else: # single gpu
+                return 'cuda:'+config.gpus, False, gpus
 
 def tensor2var(x, grad=False):
     if torch.cuda.is_available():
@@ -40,7 +46,6 @@ def weights_init(m):
     # print(classname)
     if classname.find('Conv2d') != -1:
         init.xavier_normal_(m.weight.data)
-        init.constant_(m.bias.data, 0.0)
     elif classname.find('Linear') != -1:
         init.xavier_normal_(m.weight.data)
         init.constant_(m.bias.data, 0.0)
