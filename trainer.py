@@ -121,7 +121,6 @@ class Trainer(object):
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
             ds_out_real = self.D_s(real_videos, real_labels)
 
-
             if self.adv_loss == 'wgan-gp':
                 ds_loss_real = - torch.mean(ds_out_real)
             elif self.adv_loss == 'hinge':
@@ -248,8 +247,6 @@ class Trainer(object):
     def build_model(self):
 
         print("=" * 30, '\nBuild_model...')
-        import os
-        print(os.environ["CUDA_VISIBLE_DEVICES"])
 
         self.G = Generator(self.z_dim, n_class=self.n_class, ch=self.g_chn, n_frames=self.n_frames).cuda()
         self.D_s = SpatialDiscriminator(chn=self.ds_chn, n_class=self.n_class).cuda()
@@ -257,7 +254,7 @@ class Trainer(object):
 
         if self.parallel:
             print('Use parallel...')
-            print('gpus:', list(range(len(self.gpus))))
+            print('gpus:', os.environ["CUDA_VISIBLE_DEVICES"])
             # gpus = [int(i) for i in self.gpus.split(',')]
             self.G = nn.DataParallel(self.G, device_ids=list(range(len(self.gpus))))
             self.D_s = nn.DataParallel(self.D_s, device_ids=list(range(len(self.gpus))))
