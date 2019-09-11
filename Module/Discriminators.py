@@ -56,12 +56,15 @@ class SpatialDiscriminator(nn.Module):
         out = self.conv2(out)
 
         out = F.relu(out)
-        out = out.view(batch_size, T, out.size(2), -1) # B x T x C x H x W
+        
+        out = out.permute(0, 2, 1, 3, 4).contiguous()
+        out = out.view(out.size(0), out.size(1), -1)
+        # out = out.view(batch_size, T, out.size(2), -1) # B x T x C x H x W
 
         # sum on H and W axis
-        out = out.sum(3)
+        out = out.sum(2)
         # sum on T axis
-        out = out.sum(1)
+        # out = out.sum(1)
 
         out_linear = self.linear(out).squeeze(1)
 
@@ -139,9 +142,9 @@ class TemporalDiscriminator(nn.Module):
         self.self_attn = SelfAttention(4*chn)
 
         self.conv = nn.Sequential(
-                            GResBlock(4*chn, 8*chn, bn=False, downsample_factor=2),
-                            GResBlock(8*chn, 16*chn, bn=False, downsample_factor=2),
-                            GResBlock(16*chn, 16*chn, bn=False, downsample_factor=2)
+                            GResBlock(4*chn, 8*chn, bn=False, downsample_factor=True),
+                            GResBlock(8*chn, 16*chn, bn=False, downsample_factor=True),
+                            GResBlock(16*chn, 16*chn, bn=False, downsample_factor=True)
         )
 
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
@@ -163,16 +166,19 @@ class TemporalDiscriminator(nn.Module):
         out = self.res3d(out) # B x C x T x H x W
 
         out = self.self_attn(out)
-        out = out.transpose(2, 1).contiguous() # B x T x C x W x H
+        out = out.permute(0, 2, 1, 3, 4).contiguous() # B x T x C x W x H
 
         out = self.conv(out)
         out = F.relu(out)
 
-        out = out.view(B, T, out.size(2), -1) # B x T x C x (WH)
+        out = out.permute(0, 2, 1, 3, 4).contiguous()
+        out = out.view(out.size(0), out.size(1), -1)
+        # out = out.view(batch_size, T, out.size(2), -1) # B x T x C x H x W
+
         # sum on H and W axis
-        out = out.sum(3)
+        out = out.sum(2)
         # sum on T axis
-        out = out.sum(1)
+        # out = out.sum(1)
         out_linear = self.linear(out).squeeze(1)
 
         embed = self.embed(class_id)

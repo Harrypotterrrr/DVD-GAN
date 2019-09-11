@@ -76,8 +76,8 @@ class Trainer(object):
     def label_sample(self):
         label = torch.randint(low=0, high=self.n_class, size=(self.batch_size, 1))
         # label = torch.LongTensor(self.batch_size, 1).random_()%self.n_class
-        one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
-        return label.squeeze(1).to(self.device), one_hot.to(self.device)      
+        # one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
+        return label.squeeze(1).to(self.device)#, one_hot.to(self.device)      
 
     def train(self):
 
@@ -118,84 +118,98 @@ class Trainer(object):
             # Compute loss with real images
             # Data BxCxTxHxW --> BxTxCxHxW
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
-            ds_out_real = self.D_s(real_videos, real_labels)
+
+            ##### update D twice #####
+
+            for i in range(self.d_iters):
+
+                #####samle k frames from real videos#####
+                real_videos_sample = sample_k_frames(real_videos, len(real_videos), self.k_sample)
+
+                ds_out_real = self.D_s(real_videos_sample, real_labels)
 
 
-            if self.adv_loss == 'wgan-gp':
-                ds_loss_real = - torch.mean(ds_out_real)
-            elif self.adv_loss == 'hinge':
-                ds_loss_real = torch.nn.ReLU()(1.0 - ds_out_real).mean()
+                if self.adv_loss == 'wgan-gp':
+                    ds_loss_real = - torch.mean(ds_out_real)
+                elif self.adv_loss == 'hinge':
+                    ds_loss_real = torch.nn.ReLU()(1.0 - ds_out_real).mean()
 
-            # apply Gumbel Softmax
-            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-            z_class, z_class_one_hot = self.label_sample()
-            fake_videos = self.G(z, z_class)
-            fake_videos = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
-            ds_out_fake = self.D_s(fake_videos.detach(), z_class)
+                # apply Gumbel Softmax
+                z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+                z_class = self.label_sample()
+                fake_videos = self.G(z, z_class)
 
-
-            if self.adv_loss == 'wgan-gp':
-                ds_loss_fake = ds_out_fake.mean()
-            elif self.adv_loss == 'hinge':
-                ds_loss_fake = torch.nn.ReLU()(1.0 + ds_out_fake).mean()
+                #####samle k frames from fake videos#####
+                fake_videos_sample = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
+                ds_out_fake = self.D_s(fake_videos_sample.detach(), z_class)
 
 
-            # Backward + Optimize
-            ds_loss = ds_loss_real + ds_loss_fake
-            self.reset_grad()
-            ds_loss.backward()
-            self.ds_optimizer.step()
-
-            # if self.adv_loss == 'wgan-gp':
-            #     # Compute gradient penalty
-            #     alpha = torch.rand(real_images.size(0), 1, 1, 1).to(self.device).expand_as(real_images)
-            #     interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad=True)
-            #     out = self.D(interpolated)
-
-            #     grad = torch.autograd.grad(outputs=out,
-            #                                inputs=interpolated,
-            #                                grad_outputs=torch.ones(out.size()).to(self.device),
-            #                                retain_graph=True,
-            #                                create_graph=True,
-            #                                only_inputs=True)[0]
-
-            #     grad = grad.view(grad.size(0), -1)
-            #     grad_l2norm = torch.sqrt(torch.sum(grad ** 2, dim=1))
-            #     d_loss_gp = torch.mean((grad_l2norm - 1) ** 2)
-
-            #     # Backward + Optimize
-            #     d_loss = self.lambda_gp * d_loss_gp
-
-            #     self.reset_grad()
-            #     d_loss.backward()
-            #     self.d_optimizer.step()
+                if self.adv_loss == 'wgan-gp':
+                    ds_loss_fake = ds_out_fake.mean()
+                elif self.adv_loss == 'hinge':
+                    ds_loss_fake = torch.nn.ReLU()(1.0 + ds_out_fake).mean()
 
 
-            # ================== Train D_t ================== #
+                # Backward + Optimize
+                ds_loss = ds_loss_real + ds_loss_fake
+                self.reset_grad()
+                ds_loss.backward()
+                self.ds_optimizer.step()
 
-            dt_out_real = self.D_t(real_videos, real_labels)
-            if self.adv_loss == 'wgan-gp':
-                dt_loss_real = - torch.mean(dt_out_real)
-            elif self.adv_loss == 'hinge':
-                dt_loss_real = torch.nn.ReLU()(1.0 - dt_out_real).mean()
+                # if self.adv_loss == 'wgan-gp':
+                #     # Compute gradient penalty
+                #     alpha = torch.rand(real_images.size(0), 1, 1, 1).to(self.device).expand_as(real_images)
+                #     interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad=True)
+                #     out = self.D(interpolated)
 
-            dt_out_fake = self.D_t(fake_videos.detach(), z_class)
+                #     grad = torch.autograd.grad(outputs=out,
+                #                                inputs=interpolated,
+                #                                grad_outputs=torch.ones(out.size()).to(self.device),
+                #                                retain_graph=True,
+                #                                create_graph=True,
+                #                                only_inputs=True)[0]
 
-            if self.adv_loss == 'wgan-gp':
-                dt_loss_fake = dt_out_fake.mean()
-            elif self.adv_loss == 'hinge':
-                dt_loss_fake = torch.nn.ReLU()(1.0 + dt_out_fake).mean()
+                #     grad = grad.view(grad.size(0), -1)
+                #     grad_l2norm = torch.sqrt(torch.sum(grad ** 2, dim=1))
+                #     d_loss_gp = torch.mean((grad_l2norm - 1) ** 2)
 
-            # Backward + Optimize
-            dt_loss = dt_loss_real + dt_loss_fake
-            self.reset_grad()
-            dt_loss.backward()
-            self.dt_optimizer.step()
+                #     # Backward + Optimize
+                #     d_loss = self.lambda_gp * d_loss_gp
+
+                #     self.reset_grad()
+                #     d_loss.backward()
+                #     self.d_optimizer.step()
+
+
+                # ================== Train D_t ================== #
+
+                dt_out_real = self.D_t(real_videos, real_labels)
+
+                if self.adv_loss == 'wgan-gp':
+                    dt_loss_real = - torch.mean(dt_out_real)
+                elif self.adv_loss == 'hinge':
+                    dt_loss_real = torch.nn.ReLU()(1.0 - dt_out_real).mean()
+
+                dt_out_fake = self.D_t(fake_videos.detach(), z_class)
+
+                if self.adv_loss == 'wgan-gp':
+                    dt_loss_fake = dt_out_fake.mean()
+                elif self.adv_loss == 'hinge':
+                    dt_loss_fake = torch.nn.ReLU()(1.0 + dt_out_fake).mean()
+
+                # Backward + Optimize
+                dt_loss = dt_loss_real + dt_loss_fake
+                self.reset_grad()
+                dt_loss.backward()
+                self.dt_optimizer.step()
 
             # ================== Train G and gumbel ================== #
-
+            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+            z_class = self.label_sample()
+            fake_videos = self.G(z, z_class)
+            fake_videos_sample = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
             # Compute loss with fake images
-            g_spatial_out_fake = self.D_s(fake_videos, z_class)  # Spatial Discrimminator loss
+            g_spatial_out_fake = self.D_s(fake_videos_sample, z_class)  # Spatial Discrimminator loss
             g_temporal_out_fake = self.D_t(fake_videos, z_class) # Temporal Discriminator loss
 
             if self.adv_loss == 'wgan-gp':
