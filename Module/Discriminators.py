@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from torch.nn import init
 
-from Module.Normalization import ConditionalNorm, SpectralNorm 
+from Module.Normalization import ConditionalNorm, SpectralNorm
 from Module.Attention import SelfAttention
 from Module.GResBlock import GResBlock
 
@@ -13,18 +13,18 @@ class SpatialDiscriminator(nn.Module):
     def __init__(self, chn=128, n_class=4):
         super().__init__()
 
-        self.pre_conv = nn.Sequential(SpectralNorm(nn.Conv2d(3, 2*chn, 3,padding=1),),
+        self.pre_conv = nn.Sequential(SpectralNorm(nn.Conv2d(3, 2*chn, 3, padding=1), ),
                                       nn.ReLU(),
-                                      SpectralNorm(nn.Conv2d(2*chn, 2*chn, 3,padding=1),),
+                                      SpectralNorm(nn.Conv2d(2*chn, 2*chn, 3, padding=1), ),
                                       nn.AvgPool2d(2))
         self.pre_skip = SpectralNorm(nn.Conv2d(3, 2*chn, 1))
 
         self.conv1 = GResBlock(2*chn, 4*chn, bn=False, downsample_factor=2)
         self.attn = SelfAttention(4*chn)
         self.conv2 = nn.Sequential(
-                        GResBlock(4*chn, 8*chn, bn=False, downsample_factor=2),
-                        GResBlock(8*chn, 16*chn, bn=False, downsample_factor=2),
-                        GResBlock(16*chn, 16*chn, bn=False, downsample_factor=2)
+            GResBlock(4*chn, 8*chn, bn=False, downsample_factor=2),
+            GResBlock(8*chn, 16*chn, bn=False, downsample_factor=2),
+            GResBlock(16*chn, 16*chn, bn=False, downsample_factor=2)
         )
 
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
@@ -34,11 +34,10 @@ class SpatialDiscriminator(nn.Module):
         self.embed = SpectralNorm(self.embed)
 
     def forward(self, x, class_id):
-
         # reshape input tensor from BxTxCxHxW to BTxCxHxW
         batch_size, T, C, W, H = x.size()
 
-        x = x.view(batch_size*T, C, H, W)
+        x = x.view(batch_size * T, C, H, W)
 
         out = self.pre_conv(x)
         out = out + self.pre_skip(F.avg_pool2d(x, 2))
@@ -56,7 +55,7 @@ class SpatialDiscriminator(nn.Module):
         out = self.conv2(out)
 
         out = F.relu(out)
-        
+
         out = out.permute(0, 2, 1, 3, 4).contiguous()
         out = out.view(out.size(0), out.size(1), -1)
         # out = out.view(batch_size, T, out.size(2), -1) # B x T x C x H x W
@@ -85,6 +84,7 @@ def conv3x3x3(in_planes, out_planes, stride=1):
         padding=1,
         bias=False)
 
+
 class Res3dBlock(nn.Module):
 
     def __init__(self, in_channel, out_channel, stride=1, downsample=False):
@@ -97,8 +97,9 @@ class Res3dBlock(nn.Module):
         self.downsample = downsample
         if self.downsample:
             self.conv_sc = nn.Sequential(
-                    nn.Conv3d(in_channel, out_channel, kernel_size=1, stride=stride, bias=False), 
-                    nn.BatchNorm3d(out_channel))
+                nn.Conv3d(in_channel, out_channel, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm3d(out_channel)
+            )
         self.stride = stride
 
     def forward(self, x):
@@ -123,28 +124,26 @@ class Res3dBlock(nn.Module):
 class TemporalDiscriminator(nn.Module):
 
     def __init__(self, chn=128, n_class=4):
-
         super().__init__()
 
         gain = 2 ** 0.5
-        
+
         self.pre_conv = nn.Sequential(
-                            SpectralNorm(nn.Conv3d(3, 2*chn, 3, padding=1)),
-                            nn.ReLU(),
-                            SpectralNorm(nn.Conv3d(2*chn, 2*chn, 3, padding=1)),
-                            nn.AvgPool3d(2)
+            SpectralNorm(nn.Conv3d(3, 2*chn, 3, padding=1)),
+            nn.ReLU(),
+            SpectralNorm(nn.Conv3d(2*chn, 2*chn, 3, padding=1)),
+            nn.AvgPool3d(2)
         )
         self.pre_skip = SpectralNorm(nn.Conv3d(3, 2*chn, 1))
-
 
         self.res3d = Res3dBlock(2*chn, 4*chn, downsample=True)
 
         self.self_attn = SelfAttention(4*chn)
 
         self.conv = nn.Sequential(
-                            GResBlock(4*chn, 8*chn, bn=False, downsample_factor=2),
-                            GResBlock(8*chn, 16*chn, bn=False, downsample_factor=2),
-                            GResBlock(16*chn, 16*chn, bn=False, downsample_factor=2)
+            GResBlock(4*chn, 8*chn, bn=False, downsample_factor=2),
+            GResBlock(8*chn, 16*chn, bn=False, downsample_factor=2),
+            GResBlock(16*chn, 16*chn, bn=False, downsample_factor=2)
         )
 
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
@@ -154,10 +153,9 @@ class TemporalDiscriminator(nn.Module):
         self.embed = SpectralNorm(self.embed)
 
     def forward(self, x, class_id):
-
         # pre-process with avg_pool2d to reduce tensor size
         B, T, C, H, W = x.size()
-        x = F.avg_pool2d(x.view(B*T, C, H, W), kernel_size=2)
+        x = F.avg_pool2d(x.view(B * T, C, H, W), kernel_size=2)
         _, _, H, W = x.size()
         x = x.view(B, T, C, H, W).transpose(2, 1) # B x C x T x W x H
 
@@ -219,4 +217,3 @@ if __name__ == '__main__':
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
