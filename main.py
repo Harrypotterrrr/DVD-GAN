@@ -3,7 +3,7 @@ from trainer import Trainer
 from data_loader import Data_Loader
 from torch.backends import cudnn
 from utils import make_folder
-from parameter import *
+from parameter import get_parameters
 
 import os
 import torch
@@ -103,10 +103,8 @@ def main(config):
     make_folder(config.log_path, config.version)
 
     if config.train:
-        if config.model=='sagan':
+        if config.model=='dvd-gan':
             trainer = Trainer(train_loader, config) 
-        elif config.model == 'qgan':
-            trainer = qgan_trainer(train_loader, config)
         else:
             trainer = None
 
