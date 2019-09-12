@@ -137,14 +137,14 @@ class Trainer(object):
             for i in range(self.d_iters):
 
                 # ============= Generate real video ============== #
-                real_videos_sample = sample_k_frames(real_videos, len(real_videos), self.k_sample)
+                real_videos_sample = sample_k_frames(real_videos, self.n_frames, self.k_sample)
 
                 # ============= Generate fake video ============== #
                 # apply Gumbel Softmax
                 z = torch.randn(self.batch_size, self.z_dim).to(self.device)
                 z_class = self.label_sample()
                 fake_videos = self.G(z, z_class)
-                fake_videos_sample = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
+                fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
 
                 # ================== Train D_s ================== #
                 ds_out_real = self.D_s(real_videos_sample, real_labels)
@@ -176,7 +176,7 @@ class Trainer(object):
             z = torch.randn(self.batch_size, self.z_dim).to(self.device)
             z_class = self.label_sample()
             fake_videos = self.G(z, z_class)
-            fake_videos_sample = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
+            fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
 
             # =========== Train G and Gumbel noise =========== #
             # Compute loss with fake images

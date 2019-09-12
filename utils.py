@@ -56,10 +56,9 @@ def load_value_file(file_path):
 
     return value
 
-def sample_k_frames(data, length, n_sample):
-
-    idx = torch.randint(0, length, (n_sample,))
-    srt, idx = idx.sort()
+def sample_k_frames(data, video_length, k_sample):
+    frame_idx = torch.randperm(video_length)
+    srt, idx = frame_idx[:k_sample].sort()
     return data[:, srt, :, :, :]
 
 def write_log(writer, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss):
