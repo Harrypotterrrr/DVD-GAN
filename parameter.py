@@ -8,7 +8,7 @@ def get_parameters():
     parser = argparse.ArgumentParser()
 
     # Model hyper-parameters
-    parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'qgan'])
+    parser.add_argument('--model', type=str, default='dvd-gan', choices=['dvd-gan'])
     parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge'])
     parser.add_argument('--imsize', type=int, default=128)
     parser.add_argument('--g_num', type=int, default=5)
@@ -19,7 +19,7 @@ def get_parameters():
     parser.add_argument('--g_conv_dim', type=int, default=64)
     parser.add_argument('--d_conv_dim', type=int, default=64)
     parser.add_argument('--lambda_gp', type=float, default=10)
-    parser.add_argument('--version', type=str, default='sagan_1')
+    parser.add_argument('--version', type=str, default='')
 
     # Training setting
     parser.add_argument('--total_step', type=int, default=1000000, help='how many times to update the generator')
