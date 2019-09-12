@@ -79,10 +79,31 @@ class Trainer(object):
         # one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
         return label.squeeze(1).to(self.device)  # , one_hot.to(self.device)
 
+    def calc_loss(self, x, real_flag):
+        if real_flag is True:
+            x = -x
+        if self.adv_loss == 'wgan-gp':
+            loss = torch.mean(x)
+        elif self.adv_loss == 'hinge':
+            loss = torch.nn.ReLU()(1.0 + x).mean()
+        return loss
+
+    def gen_real_video(self, data_iter):
+
+        try:
+            real_videos, real_labels = next(data_iter)
+            if real_videos.size(0) != self.batch_size / len(self.gpus):
+                data_iter = iter(self.data_loader)
+                real_videos, real_labels = next(data_iter)
+        except:
+            data_iter = iter(self.data_loader)
+            real_videos, real_labels = next(data_iter)
+
+        return real_videos, real_labels
+
     def train(self):
 
         # Data iterator
-
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
         model_save_step = int(self.model_save_step * step_per_epoch)
@@ -105,48 +126,31 @@ class Trainer(object):
 
         for step in range(start, self.total_step):
 
-            # ================== Train D_s ================== #
-            try:
-                real_videos, real_labels = next(data_iter)
-            except:
-                data_iter = iter(self.data_loader)
-                real_videos, real_labels = next(data_iter)
-
+            real_videos, real_labels = self.gen_real_video(data_iter)
             real_labels = real_labels.to(self.device)
             real_videos = real_videos.to(self.device)
 
-            # Compute loss with real images
-            # Data BxCxTxHxW --> BxTxCxHxW
+            # B x C x T x H x W --> B x T x C x H x W
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
 
-            # ====== update D d_iters times ====== #
-
+            # ================ update D d_iters times ================ #
             for i in range(self.d_iters):
 
-                # ====== samle k frames from real videos ====== #
-
+                # ============= Generate real video ============== #
                 real_videos_sample = sample_k_frames(real_videos, len(real_videos), self.k_sample)
 
-                ds_out_real = self.D_s(real_videos_sample, real_labels)
-
-                if self.adv_loss == 'wgan-gp':
-                    ds_loss_real = - torch.mean(ds_out_real)
-                elif self.adv_loss == 'hinge':
-                    ds_loss_real = torch.nn.ReLU()(1.0 - ds_out_real).mean()
-
+                # ============= Generate fake video ============== #
                 # apply Gumbel Softmax
                 z = torch.randn(self.batch_size, self.z_dim).to(self.device)
                 z_class = self.label_sample()
                 fake_videos = self.G(z, z_class)
-
-                # ====== samle k frames from fake videos ====== #
                 fake_videos_sample = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
-                ds_out_fake = self.D_s(fake_videos_sample.detach(), z_class)
 
-                if self.adv_loss == 'wgan-gp':
-                    ds_loss_fake = ds_out_fake.mean()
-                elif self.adv_loss == 'hinge':
-                    ds_loss_fake = torch.nn.ReLU()(1.0 + ds_out_fake).mean()
+                # ================== Train D_s ================== #
+                ds_out_real = self.D_s(real_videos_sample, real_labels)
+                ds_out_fake = self.D_s(fake_videos_sample.detach(), z_class)
+                ds_loss_real = self.calc_loss(ds_out_real, True)
+                ds_loss_fake = self.calc_loss(ds_out_fake, False)
 
                 # Backward + Optimize
                 ds_loss = ds_loss_real + ds_loss_fake
@@ -154,45 +158,10 @@ class Trainer(object):
                 ds_loss.backward()
                 self.ds_optimizer.step()
 
-                # if self.adv_loss == 'wgan-gp':
-                #     # Compute gradient penalty
-                #     alpha = torch.rand(real_images.size(0), 1, 1, 1).to(self.device).expand_as(real_images)
-                #     interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad=True)
-                #     out = self.D(interpolated)
-
-                #     grad = torch.autograd.grad(outputs=out,
-                #                                inputs=interpolated,
-                #                                grad_outputs=torch.ones(out.size()).to(self.device),
-                #                                retain_graph=True,
-                #                                create_graph=True,
-                #                                only_inputs=True)[0]
-
-                #     grad = grad.view(grad.size(0), -1)
-                #     grad_l2norm = torch.sqrt(torch.sum(grad ** 2, dim=1))
-                #     d_loss_gp = torch.mean((grad_l2norm - 1) ** 2)
-
-                #     # Backward + Optimize
-                #     d_loss = self.lambda_gp * d_loss_gp
-
-                #     self.reset_grad()
-                #     d_loss.backward()
-                #     self.d_optimizer.step()
-
-                # ================== Train D_t ================== #
-
                 dt_out_real = self.D_t(real_videos, real_labels)
-
-                if self.adv_loss == 'wgan-gp':
-                    dt_loss_real = - torch.mean(dt_out_real)
-                elif self.adv_loss == 'hinge':
-                    dt_loss_real = torch.nn.ReLU()(1.0 - dt_out_real).mean()
-
                 dt_out_fake = self.D_t(fake_videos.detach(), z_class)
-
-                if self.adv_loss == 'wgan-gp':
-                    dt_loss_fake = dt_out_fake.mean()
-                elif self.adv_loss == 'hinge':
-                    dt_loss_fake = torch.nn.ReLU()(1.0 + dt_out_fake).mean()
+                dt_loss_real = self.calc_loss(dt_out_real, True)
+                dt_loss_fake = self.calc_loss(dt_out_fake, False)
 
                 # Backward + Optimize
                 dt_loss = dt_loss_real + dt_loss_fake
@@ -200,32 +169,33 @@ class Trainer(object):
                 dt_loss.backward()
                 self.dt_optimizer.step()
 
-            # ================== Train G and Gumbel noise ================== #
+            # ==================== update G 1 time ==================== #
+
+            # ============= Generate fake video ============== #
+            # apply Gumbel Softmax
             z = torch.randn(self.batch_size, self.z_dim).to(self.device)
             z_class = self.label_sample()
             fake_videos = self.G(z, z_class)
             fake_videos_sample = sample_k_frames(fake_videos, len(fake_videos), self.k_sample)
+
+            # =========== Train G and Gumbel noise =========== #
             # Compute loss with fake images
-            g_spatial_out_fake = self.D_s(fake_videos_sample, z_class)  # Spatial Discrimminator loss
-            g_temporal_out_fake = self.D_t(fake_videos, z_class)  # Temporal Discriminator loss
+            g_s_out_fake = self.D_s(fake_videos_sample, z_class)  # Spatial Discrimminator loss
+            g_t_out_fake = self.D_t(fake_videos, z_class)  # Temporal Discriminator loss
+            g_loss = self.calc_loss(g_s_out_fake, True) + self.calc_loss(g_t_out_fake, True)
 
-            if self.adv_loss == 'wgan-gp':
-                g_loss = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
-            elif self.adv_loss == 'hinge':
-                g_loss = -g_spatial_out_fake.mean() - g_temporal_out_fake.mean()
-
+            # Backward + Optimize
             self.reset_grad()
             g_loss.backward()
             self.g_optimizer.step()
 
+
+            # ==================== print & save part ==================== #
             # Print out log info
             if (step + 1) % self.log_step == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 start_time = time.time()
-                # print("Elapsed [{}], G_step [{}/{}], D_step[{}/{}], d_out_real: {:.4f}, d_out_fake: {:.4f}, g_loss_fake: {:.4f}".
-                #       format(elapsed, step + 1, self.total_step, (step + 1),
-                #              self.total_step , d_loss_real.item(), d_loss_fake.item(), g_loss_fake.item()))
                 print(
                     "Step: [%d/%d], time: %s, ds_loss: %.4f, dt_loss: %.4f, g_loss: %.4f" %
                     (step + 1, self.total_step, elapsed, ds_loss, dt_loss, g_loss)
@@ -235,7 +205,6 @@ class Trainer(object):
                     write_log(self.writer, step + 1, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
 
             # Sample images
-            # Need to rewrite
             if (step + 1) % self.sample_step == 0:
                 print('Saved sample images {}_fake.png'.format(step + 1))
                 fake_videos = self.G(fixed_z, z_class)
@@ -244,6 +213,7 @@ class Trainer(object):
                     save_image(denorm(fake_videos[i].data),
                                os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step + 1, i + 1)))
 
+            # Save model
             if (step + 1) % model_save_step == 0:
                 torch.save(self.G.state_dict(),
                            os.path.join(self.model_save_path, '{}_G.pth'.format(step + 1)))
@@ -263,11 +233,10 @@ class Trainer(object):
         if self.parallel:
             print('Use parallel...')
             print('gpus:', os.environ["CUDA_VISIBLE_DEVICES"])
-            gpus = [int(i) for i in self.gpus.split(',')]
 
-            self.G = nn.DataParallel(self.G, device_ids=gpus)
-            self.D_s = nn.DataParallel(self.D_s, device_ids=gpus)
-            self.D_t = nn.DataParallel(self.D_t, device_ids=gpus)
+            self.G = nn.DataParallel(self.G, device_ids=list(range(len(self.gpus))))
+            self.D_s = nn.DataParallel(self.D_s, device_ids=list(range(len(self.gpus))))
+            self.D_t = nn.DataParallel(self.D_t, device_ids=list(range(len(self.gpus))))
 
         # self.G.apply(weights_init)
         # self.D.apply(weights_init)
