@@ -9,7 +9,6 @@ from Module.Generator import Generator
 from Module.Discriminators import SpatialDiscriminator, TemporalDiscriminator
 from utils import *
 
-
 class Trainer(object):
     def __init__(self, data_loader, config):
 
@@ -53,7 +52,7 @@ class Trainer(object):
         self.sample_path = config.sample_path
         self.log_step = config.log_step
         self.sample_step = config.sample_step
-        self.model_save_step = config.model_save_step
+        self.model_save_epoch = config.model_save_epoch
         self.version = config.version
 
         # Path
@@ -106,7 +105,7 @@ class Trainer(object):
         # Data iterator
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
-        model_save_step = int(self.model_save_step * step_per_epoch)
+        model_save_epoch = int(self.model_save_epoch * step_per_epoch)
 
         fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
 
@@ -126,7 +125,15 @@ class Trainer(object):
 
         for step in range(start, self.total_step):
 
-            real_videos, real_labels = self.gen_real_video(data_iter)
+            # real_videos, real_labels = self.gen_real_video(data_iter)
+            try:
+                real_videos, real_labels = next(data_iter)
+                if real_videos.size(0) != self.batch_size / len(self.gpus):
+                    data_iter = iter(self.data_loader)
+                    real_videos, real_labels = next(data_iter)
+            except:
+                data_iter = iter(self.data_loader)
+                real_videos, real_labels = next(data_iter)
             real_labels = real_labels.to(self.device)
             real_videos = real_videos.to(self.device)
 
@@ -189,7 +196,6 @@ class Trainer(object):
             g_loss.backward()
             self.g_optimizer.step()
 
-
             # ==================== print & save part ==================== #
             # Print out log info
             if (step + 1) % self.log_step == 0:
@@ -214,7 +220,7 @@ class Trainer(object):
                                os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step + 1, i + 1)))
 
             # Save model
-            if (step + 1) % model_save_step == 0:
+            if (step + 1) % model_save_epoch == 0:
                 torch.save(self.G.state_dict(),
                            os.path.join(self.model_save_path, '{}_G.pth'.format(step + 1)))
                 torch.save(self.D_s.state_dict(),
