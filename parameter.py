@@ -12,7 +12,7 @@ def get_parameters():
     parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge'])
     parser.add_argument('--imsize', type=int, default=128)
     parser.add_argument('--g_num', type=int, default=5)
-    parser.add_argument('--g_chn', type=int, default=3)
+    parser.add_argument('--g_chn', type=int, default=32)
     parser.add_argument('--z_dim', type=int, default=120)
     parser.add_argument('--ds_chn', type=int, default=32) # SpatialDiscriminator channel
     parser.add_argument('--dt_chn', type=int, default=32) # TemporalDiscriminator channel
@@ -25,7 +25,7 @@ def get_parameters():
     parser.add_argument('--total_step', type=int, default=1000000, help='how many times to update the generator')
     parser.add_argument('--d_iters', type=float, default=2)
     parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--num_workers', type=int, default=12)
+    parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--g_lr', type=float, default=0.0001)
     parser.add_argument('--d_lr', type=float, default=0.0002)
     parser.add_argument('--lr_decay', type=float, default=0.9999)
@@ -41,8 +41,8 @@ def get_parameters():
     parser.add_argument('-g', '--gpus', default=[], nargs='+', type=str, help='Specify GPU ids.')
     parser.add_argument('--dataset', type=str, default='ucf101', choices=['ucf101', 'kinetics','activitynet', 'hmdb51'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=False)
-    parser.add_argument('--n_class', type=int, default=10)
-    parser.add_argument('--k_sample', type=int, default=8)
+    parser.add_argument('--n_class', type=int, default=101)
+    parser.add_argument('--k_sample', type=int, default=64)
     parser.add_argument('--n_frames', type=int, default=24)
 
     # Pathl
