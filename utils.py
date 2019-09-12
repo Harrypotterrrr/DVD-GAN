@@ -16,13 +16,14 @@ def set_device(config):
         if torch.cuda.is_available() is False: # cpu
             return 'cpu', False, ""
         else:
-            # gpus = config.gpus.split(',')
+            # gpus = config.gpus.split(',') # if config.gpus is a list
             # gpus = (',').join(list(map(str, range(0, len(gpus))))) # generate a list of string number from 0 to len(config.gpus)
             gpus = list(range(len(config.gpus)))
             if config.parallel is True and len(gpus) > 1: # multi gpus
                 return 'cuda', True, gpus
             else: # single gpu
-                return 'cuda:'+config.gpus, False, gpus
+                print("123123")
+                return 'cuda:'+ str(config.gpus[0]), False, gpus
 
 def tensor2var(x, grad=False):
     if torch.cuda.is_available():

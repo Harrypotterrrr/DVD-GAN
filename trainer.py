@@ -240,9 +240,9 @@ class Trainer(object):
             print('Use parallel...')
             print('gpus:', os.environ["CUDA_VISIBLE_DEVICES"])
 
-            self.G = nn.DataParallel(self.G, device_ids=list(range(len(self.gpus))))
-            self.D_s = nn.DataParallel(self.D_s, device_ids=list(range(len(self.gpus))))
-            self.D_t = nn.DataParallel(self.D_t, device_ids=list(range(len(self.gpus))))
+            self.G = nn.DataParallel(self.G, device_ids=self.gpus)
+            self.D_s = nn.DataParallel(self.D_s, device_ids=self.gpus)
+            self.D_t = nn.DataParallel(self.D_t, device_ids=self.gpus)
 
         # self.G.apply(weights_init)
         # self.D.apply(weights_init)
