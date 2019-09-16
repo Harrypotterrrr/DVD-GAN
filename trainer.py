@@ -163,7 +163,9 @@ class Trainer(object):
             # B x C x T x H x W --> B x T x C x H x W
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
 
+        
             # ================ update D d_iters times ================ #
+            self.d_iters = 1
             for i in range(self.d_iters):
 
                 # ============= Generate real video ============== #
@@ -189,8 +191,12 @@ class Trainer(object):
                 self.ds_optimizer.step()
 
                 # ================== Train D_t ================== #
-                dt_out_real = self.D_t(real_videos, real_labels)
-                dt_out_fake = self.D_t(fake_videos.detach(), z_class)
+
+                real_videos_downsample = vid_downsample(real_videos)
+                fake_videos_downsample = vid_downsample(fake_videos)
+
+                dt_out_real = self.D_t(real_videos_downsample, real_labels)
+                dt_out_fake = self.D_t(fake_videos_downsample.detach(), z_class)
                 dt_loss_real = self.calc_loss(dt_out_real, True)
                 dt_loss_fake = self.calc_loss(dt_out_fake, False)
 
@@ -213,17 +219,20 @@ class Trainer(object):
             # ==================== update G 1 time ==================== #
 
             # ============= Generate fake video ============== #
-            # # apply Gumbel Softmax
+            # apply Gumbel Softmax
             # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
             # z_class = self.label_sample()
             # fake_videos = self.G(z, z_class)
             # fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
+            # fake_videos_downsample = vid_downsample(fake_videos)
 
             # =========== Train G and Gumbel noise =========== #
             # Compute loss with fake images
             g_s_out_fake = self.D_s(fake_videos_sample, z_class)  # Spatial Discrimminator loss
-            g_t_out_fake = self.D_t(fake_videos, z_class)  # Temporal Discriminator loss
-            g_loss = self.calc_loss(g_s_out_fake, True) + self.calc_loss(g_t_out_fake, True)
+            g_t_out_fake = self.D_t(fake_videos_downsample, z_class)  # Temporal Discriminator loss
+            g_s_loss = self.calc_loss(g_s_out_fake, True)
+            g_t_loss = self.calc_loss(g_t_out_fake, True)
+            g_loss = g_s_loss + g_t_loss
 
             # Backward + Optimize
             self.reset_grad()
@@ -237,8 +246,8 @@ class Trainer(object):
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 start_time = time.time()
                 print(
-                    "Step: [%d/%d], time: %s, ds_loss: %.4f, dt_loss: %.4f, g_loss: %.4f" %
-                    (step + 1, self.total_step, elapsed, ds_loss, dt_loss, g_loss)
+                    "Step: [%d/%d], time: %s, ds_loss: %.4f, dt_loss: %.4f, g_s_loss: %.4f, g_t_loss: %.4f, g_loss: %.4f" %
+                    (step + 1, self.total_step, elapsed, ds_loss, dt_loss, g_s_loss, g_t_loss, g_loss)
                 )
 
                 if self.use_tensorboard is True:

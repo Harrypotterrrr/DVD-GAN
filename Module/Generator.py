@@ -95,33 +95,27 @@ class Generator(nn.Module):
 
         # the time axis is folded into the batch axis before the forward pass, which applying ResNet to all frames indivudually
         y = y.view(-1, 8 * self.ch, self.latent_dim, self.latent_dim) # (B x T) x ch x ld x ld
-        output = []
 
-        for i in range(self.n_frames):
-            frame = y
-            for j, conv in enumerate(self.conv):
-                if isinstance(conv, GResBlock):
-                    condition = torch.cat([noise_emb, class_emb], dim=1)
-                    condition = condition.repeat(self.n_frames, 1)
-                    frame = conv(frame, condition)
-                else:
-                    BT, C, W, H = frame.size()
-                    frame = frame.view(-1, self.n_frames, C, W, H).transpose(2, 1) # B, C, T, W, H
-                    frame = conv(frame)
-                    frame = frame.permute(0, 2, 1, 3, 4).contiguous().view(-1, C, W, H) # BT, C, W, H
+        frame = y
+        for j, conv in enumerate(self.conv):
+            if isinstance(conv, GResBlock):
+                condition = torch.cat([noise_emb, class_emb], dim=1)
+                condition = condition.repeat(self.n_frames, 1)
+                frame = conv(frame, condition)
+            else:
+                BT, C, W, H = frame.size()
+                frame = frame.view(-1, self.n_frames, C, W, H).transpose(2, 1) # B, C, T, W, H
+                frame = conv(frame)
+                frame = frame.permute(0, 2, 1, 3, 4).contiguous().view(-1, C, W, H) # BT, C, W, H
 
-            BT, C, W, H = frame.size()
-            frame = frame.view(-1, self.n_frames, C, W, H) # B, T, C, W, H
-            frame = frame[:, i]
-            frame = F.relu(frame)
-            frame = self.colorize(frame)
-            frame = torch.tanh(frame)
-            output.append(frame)
-	
-        output = torch.stack(output, dim=0) # T x B x C x W x H
-        output = output.transpose(1, 0).contiguous() # B x T x C x W x H
+        frame = F.relu(frame)
+        frame = self.colorize(frame)
+        frame = torch.tanh(frame)
 
-        return output
+        BT, C, W, H = frame.size()
+        frame = frame.view(-1, self.n_frames, C, W, H) # B, T, C, W, H
+
+        return frame
 
 
 if __name__ == "__main__":
