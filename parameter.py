@@ -54,7 +54,7 @@ def get_parameters():
     # Step size
     parser.add_argument('--log_step', type=int, default=10)
     parser.add_argument('--sample_step', type=int, default=200)
-    parser.add_argument('--model_save_epoch', type=float, default=1.0)
+    parser.add_argument('--model_save_epoch', type=int, default=1)
 
     # Dataloader
     parser.add_argument('--norm_value', type=int, default=255)

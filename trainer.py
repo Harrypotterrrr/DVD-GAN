@@ -78,6 +78,30 @@ class Trainer(object):
         # one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
         return label.squeeze(1).to(self.device)  # , one_hot.to(self.device)
 
+    def wgan_loss(self, real_img, fake_img, tag):
+
+        # Compute gradient penalty
+        alpha = torch.rand(real_img.size(0), 1, 1, 1).cuda().expand_as(real_img)
+        interpolated = torch.tensor(alpha * real_img.data + (1 - alpha) * fake_img.data, requires_grad=True)
+        if tag == 'S':
+            out = self.D_s(interpolated)
+        else:
+            out = self.D_t(interpolated)
+        grad = torch.autograd.grad(outputs=out,
+                                   inputs=interpolated,
+                                   grad_outputs=torch.ones(out.size()).cuda(),
+                                   retain_graph=True,
+                                   create_graph=True,
+                                   only_inputs=True)[0]
+
+        grad = grad.view(grad.size(0), -1)
+        grad_l2norm = torch.sqrt(torch.sum(grad ** 2, dim=1))
+        d_loss_gp = torch.mean((grad_l2norm - 1) ** 2)
+
+        # Backward + Optimize
+        loss = self.lambda_gp * d_loss_gp
+        return loss
+
     def calc_loss(self, x, real_flag):
         if real_flag is True:
             x = -x
@@ -105,10 +129,9 @@ class Trainer(object):
         # Data iterator
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
-        model_save_epoch = int(self.model_save_epoch * step_per_epoch)
+        model_save_epoch = self.model_save_epoch * step_per_epoch
 
         fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-
         # Start with trained model
         if self.pretrained_model:
             start = self.pretrained_model + 1
@@ -165,6 +188,7 @@ class Trainer(object):
                 ds_loss.backward()
                 self.ds_optimizer.step()
 
+                # ================== Train D_t ================== #
                 dt_out_real = self.D_t(real_videos, real_labels)
                 dt_out_fake = self.D_t(fake_videos.detach(), z_class)
                 dt_loss_real = self.calc_loss(dt_out_real, True)
@@ -176,14 +200,24 @@ class Trainer(object):
                 dt_loss.backward()
                 self.dt_optimizer.step()
 
+                # ================== Use wgan_gp ================== #
+                # if self.adv_loss == "wgan_gp":
+                #     dt_wgan_loss = self.wgan_loss(real_labels, fake_videos, 'T')
+                #     ds_wgan_loss = self.wgan_loss(real_labels, fake_videos, 'S')
+                #     self.reset_grad()
+                #     dt_wgan_loss.backward()
+                #     ds_wgan_loss.backward()
+                #     self.dt_optimizer.step()
+                #     self.ds_optimizer.step()
+
             # ==================== update G 1 time ==================== #
 
             # ============= Generate fake video ============== #
-            # apply Gumbel Softmax
-            z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-            z_class = self.label_sample()
-            fake_videos = self.G(z, z_class)
-            fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
+            # # apply Gumbel Softmax
+            # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+            # z_class = self.label_sample()
+            # fake_videos = self.G(z, z_class)
+            # fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
 
             # =========== Train G and Gumbel noise =========== #
             # Compute loss with fake images

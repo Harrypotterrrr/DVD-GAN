@@ -3,8 +3,8 @@ import torch
 from torch.nn import init
 
 def make_folder(path, version):
-        if not os.path.exists(os.path.join(path, version)):
-            os.makedirs(os.path.join(path, version))
+    if not os.path.exists(os.path.join(path, version)):
+        os.makedirs(os.path.join(path, version))
 
 def set_device(config):
 
@@ -22,8 +22,7 @@ def set_device(config):
             if config.parallel is True and len(gpus) > 1: # multi gpus
                 return 'cuda', True, gpus
             else: # single gpu
-                print("123123")
-                return 'cuda:'+ str(config.gpus[0]), False, gpus
+                return 'cuda:'+ str(gpus[0]), False, gpus
 
 def tensor2var(x, grad=False):
     if torch.cuda.is_available():
