@@ -1,6 +1,7 @@
 import os
 import torch
 from torch.nn import init
+import torch.nn.functional as F
 
 def make_folder(path, version):
         if not os.path.exists(os.path.join(path, version)):
@@ -71,3 +72,11 @@ def write_log(writer, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, d
     writer.add_scalar('data/dt_loss_fake', dt_loss_fake.item(), (step))
     writer.add_scalar('data/dt_loss', dt_loss.item(), (step))
     writer.add_scalar('data/g_loss_fake', g_loss.item(), (step))
+
+def vid_downsample(data):
+    out = data
+    B, T, C, H, W = out.size()
+    x = F.avg_pool2d(out.view(B * T, C, H, W), kernel_size=2)
+    _, _, H, W = x.size()
+    x = x.view(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous()
+    return x
