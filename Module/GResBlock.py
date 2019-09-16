@@ -40,9 +40,7 @@ class GResBlock(nn.Module):
 
     def forward(self, x, condition=None):
 
-        batch_size, T, C, W, H = x.size()
-        x = x.view(-1, C, W, H) # combine temporal dimension into batch
-
+        BT, C, W, H = x.size()
         out = x
 
         if self.bn:
@@ -57,7 +55,7 @@ class GResBlock(nn.Module):
         out = self.conv0(out)
 
         if self.bn:
-            out = out.view(batch_size * T, -1, W * self.upsample_factor, H * self.upsample_factor)
+            out = out.view(BT, -1, W * self.upsample_factor, H * self.upsample_factor)
             out = self.CBNorm2(out, condition)
 
         out = self.activation(out)
@@ -73,13 +71,12 @@ class GResBlock(nn.Module):
             skip = self.conv_sc(skip)
             if self.downsample_factor != 1:
                 skip = F.avg_pool2d(skip, self.downsample_factor)
-
         else:
             skip = x
 
         y = out + skip
         y = y.view(
-            batch_size, T, -1,
+            BT, -1,
             W * self.upsample_factor // self.downsample_factor,
             H * self.upsample_factor // self.downsample_factor
         )
@@ -94,7 +91,7 @@ if __name__ == "__main__":
     n_frames = 20
 
     gResBlock = GResBlock(3, 100, [3, 3])
-    x = torch.rand([batch_size, n_frames, 3, 64, 64])
+    x = torch.rand([batch_size * n_frames, 3, 64, 64])
     condition = torch.rand([batch_size, n_class])
     condition = condition.repeat(n_frames, 1)
     y = gResBlock(x, condition)
