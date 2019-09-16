@@ -12,7 +12,7 @@ from Module.Attention import SelfAttention, SeparableAttn
 
 class Generator(nn.Module):
 
-    def __init__(self, in_dim=120, latent_dim=4, n_class=4, ch=32, n_frames=48, hierar_flag=False, debug=False):
+    def __init__(self, in_dim=120, latent_dim=4, n_class=4, ch=32, n_frames=48, hierar_flag=False):
         super().__init__()
 
         self.in_dim = in_dim
@@ -91,29 +91,27 @@ class Generator(nn.Module):
 
         y = self.self_attn(y)  # B x ch x T x ld x ld
 
-        y = y.permute(0, 2, 1, 3, 4) # B x T x ch x ld x ld
+        y = y.permute(0, 2, 1, 3, 4).contiguous() # B x T x ch x ld x ld
 
-        # the time axis is folded into the batch axis before the forward pass
-        # y = y.contiguous().view(-1, 8 * self.ch, self.latent_dim, self.latent_dim) # (B x T) x ch x ld x ld
+        # the time axis is folded into the batch axis before the forward pass, which applying ResNet to all frames indivudually
+        y = y.view(-1, 8 * self.ch, self.latent_dim, self.latent_dim) # (B x T) x ch x ld x ld
         output = []
 
         for i in range(self.n_frames):
-            frame = y.clone() # TODO Apply ResNet to all frames individually.
+            frame = y
             for j, conv in enumerate(self.conv):
                 if isinstance(conv, GResBlock):
-                    if self.hierar_flag is True: # TODO useless
-                        conv_code = noise_emb[j + 1]
-                        condition = torch.cat([conv_code, class_emb], self.n_class)
-                        frame = conv(frame, condition)
-                    else:
-                        condition = torch.cat([noise_emb, class_emb], dim=1)
-                        condition = condition.repeat(self.n_frames, 1)
-                        frame = conv(frame, condition)
+                    condition = torch.cat([noise_emb, class_emb], dim=1)
+                    condition = condition.repeat(self.n_frames, 1)
+                    frame = conv(frame, condition)
                 else:
-                    frame = frame.permute(0, 2, 1, 3, 4)
+                    BT, C, W, H = frame.size()
+                    frame = frame.view(-1, self.n_frames, C, W, H).transpose(2, 1) # B, C, T, W, H
                     frame = conv(frame)
-                    frame = frame.permute(0, 2, 1, 3, 4).contiguous()
+                    frame = frame.permute(0, 2, 1, 3, 4).contiguous().view(-1, C, W, H) # BT, C, W, H
 
+            BT, C, W, H = frame.size()
+            frame = frame.view(-1, self.n_frames, C, W, H) # B, T, C, W, H
             frame = frame[:, i]
             frame = F.relu(frame)
             frame = self.colorize(frame)
