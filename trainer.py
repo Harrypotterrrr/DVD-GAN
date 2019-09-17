@@ -9,6 +9,7 @@ from Module.Generator import Generator
 from Module.Discriminators import SpatialDiscriminator, TemporalDiscriminator
 from utils import *
 
+
 class Trainer(object):
     def __init__(self, data_loader, config):
 
@@ -132,6 +133,7 @@ class Trainer(object):
         model_save_epoch = self.model_save_epoch * step_per_epoch
 
         fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+
         # Start with trained model
         if self.pretrained_model:
             start = self.pretrained_model + 1
@@ -163,7 +165,6 @@ class Trainer(object):
             # B x C x T x H x W --> B x T x C x H x W
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
 
-        
             # ================ update D d_iters times ================ #
             self.d_iters = 1
             for i in range(self.d_iters):
@@ -176,11 +177,11 @@ class Trainer(object):
                 z = torch.randn(self.batch_size, self.z_dim).to(self.device)
                 z_class = self.label_sample()
                 fake_videos = self.G(z, z_class)
-                fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
 
                 # ================== Train D_s ================== #
+                fake_videos_sample = sample_k_frames(fake_videos.detach(), self.n_frames, self.k_sample)
                 ds_out_real = self.D_s(real_videos_sample, real_labels)
-                ds_out_fake = self.D_s(fake_videos_sample.detach(), z_class)
+                ds_out_fake = self.D_s(fake_videos_sample, z_class)
                 ds_loss_real = self.calc_loss(ds_out_real, True)
                 ds_loss_fake = self.calc_loss(ds_out_fake, False)
 
@@ -191,12 +192,11 @@ class Trainer(object):
                 self.ds_optimizer.step()
 
                 # ================== Train D_t ================== #
-
                 real_videos_downsample = vid_downsample(real_videos)
-                fake_videos_downsample = vid_downsample(fake_videos)
+                fake_videos_downsample = vid_downsample(fake_videos.detach())
 
                 dt_out_real = self.D_t(real_videos_downsample, real_labels)
-                dt_out_fake = self.D_t(fake_videos_downsample.detach(), z_class)
+                dt_out_fake = self.D_t(fake_videos_downsample, z_class)
                 dt_loss_real = self.calc_loss(dt_out_real, True)
                 dt_loss_fake = self.calc_loss(dt_out_fake, False)
 
@@ -217,7 +217,6 @@ class Trainer(object):
                 #     self.ds_optimizer.step()
 
             # ==================== update G 1 time ==================== #
-
             # ============= Generate fake video ============== #
             # apply Gumbel Softmax
             # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
@@ -233,6 +232,7 @@ class Trainer(object):
             g_s_loss = self.calc_loss(g_s_out_fake, True)
             g_t_loss = self.calc_loss(g_t_out_fake, True)
             g_loss = g_s_loss + g_t_loss
+            # g_loss = self.calc_loss(g_s_out_fake, True) + self.calc_loss(g_t_out_fake, True)
 
             # Backward + Optimize
             self.reset_grad()
@@ -251,7 +251,8 @@ class Trainer(object):
                 )
 
                 if self.use_tensorboard is True:
-                    write_log(self.writer, step + 1, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
+                    write_log(self.writer, step + 1, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake,
+                              dt_loss, g_loss)
 
             # Sample images
             if (step + 1) % self.sample_step == 0:
