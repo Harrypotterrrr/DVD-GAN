@@ -179,9 +179,9 @@ class Trainer(object):
                 fake_videos = self.G(z, z_class)
 
                 # ================== Train D_s ================== #
-                fake_videos_sample = sample_k_frames(fake_videos.detach(), self.n_frames, self.k_sample)
+                fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
                 ds_out_real = self.D_s(real_videos_sample, real_labels)
-                ds_out_fake = self.D_s(fake_videos_sample, z_class)
+                ds_out_fake = self.D_s(fake_videos_sample.detach(), z_class)
                 ds_loss_real = self.calc_loss(ds_out_real, True)
                 ds_loss_fake = self.calc_loss(ds_out_fake, False)
 
@@ -194,10 +194,10 @@ class Trainer(object):
 
                 # ================== Train D_t ================== #
                 real_videos_downsample = vid_downsample(real_videos)
-                fake_videos_downsample = vid_downsample(fake_videos.detach())
+                fake_videos_downsample = vid_downsample(fake_videos)
 
                 dt_out_real = self.D_t(real_videos_downsample, real_labels)
-                dt_out_fake = self.D_t(fake_videos_downsample, z_class)
+                dt_out_fake = self.D_t(fake_videos_downsample.detach(), z_class)
                 dt_loss_real = self.calc_loss(dt_out_real, True)
                 dt_loss_fake = self.calc_loss(dt_out_fake, False)
 
