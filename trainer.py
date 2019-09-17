@@ -4,6 +4,7 @@ import datetime
 
 import torch.nn as nn
 from torchvision.utils import save_image
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from Module.Generator import Generator
 from Module.Discriminators import SpatialDiscriminator, TemporalDiscriminator
@@ -166,7 +167,6 @@ class Trainer(object):
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
 
             # ================ update D d_iters times ================ #
-            self.d_iters = 1
             for i in range(self.d_iters):
 
                 # ============= Generate real video ============== #
@@ -190,6 +190,7 @@ class Trainer(object):
                 self.reset_grad()
                 ds_loss.backward()
                 self.ds_optimizer.step()
+                self.ds_lr_scher.step(ds_loss)
 
                 # ================== Train D_t ================== #
                 real_videos_downsample = vid_downsample(real_videos)
@@ -205,6 +206,7 @@ class Trainer(object):
                 self.reset_grad()
                 dt_loss.backward()
                 self.dt_optimizer.step()
+                self.dt_lr_scher.step(dt_loss)
 
                 # ================== Use wgan_gp ================== #
                 # if self.adv_loss == "wgan_gp":
@@ -238,6 +240,7 @@ class Trainer(object):
             self.reset_grad()
             g_loss.backward()
             self.g_optimizer.step()
+            self.g_lr_scher.step(g_loss)
 
             # ==================== print & save part ==================== #
             # Print out log info
@@ -299,6 +302,24 @@ class Trainer(object):
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
                                              (self.beta1, self.beta2))
 
+        self.g_lr_scher = ReduceLROnPlateau(self.g_optimizer, mode='min',
+                                            factor=self.lr_decay, patience=100,
+                                            threshold=0.0001, threshold_mode='rel',
+                                            cooldown=0, min_lr=1e-10, eps=1e-08,
+                                            verbose=True
+                          )
+        self.ds_lr_scher = ReduceLROnPlateau(self.ds_optimizer, mode='min',
+                                             factor=self.lr_decay, patience=100,
+                                             threshold=0.0001, threshold_mode='rel',
+                                             cooldown=0, min_lr=1e-10, eps=1e-08,
+                                             verbose=True
+                                             )
+        self.dt_lr_scher = ReduceLROnPlateau(self.dt_optimizer, mode='min',
+                                             factor=self.lr_decay, patience=100,
+                                             threshold=0.0001, threshold_mode='rel',
+                                             cooldown=0, min_lr=1e-10, eps=1e-08,
+                                             verbose=True
+                                             )
         self.c_loss = torch.nn.CrossEntropyLoss()
 
     def build_tensorboard(self):
