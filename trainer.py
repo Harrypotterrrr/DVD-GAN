@@ -35,6 +35,7 @@ class Trainer(object):
         self.lambda_gp = config.lambda_gp
         self.total_step = config.total_step
         self.d_iters = config.d_iters
+        self.g_iters = config.g_iters
         self.batch_size = config.batch_size
         self.num_workers = config.num_workers
         self.g_lr = config.g_lr
@@ -218,14 +219,18 @@ class Trainer(object):
                 #     self.dt_optimizer.step()
                 #     self.ds_optimizer.step()
 
-            # ==================== update G 1 time ==================== #
-            # ============= Generate fake video ============== #
-            # apply Gumbel Softmax
-            # z = torch.randn(self.batch_size, self.z_dim).to(self.device)
-            # z_class = self.label_sample()
-            # fake_videos = self.G(z, z_class)
-            # fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
-            # fake_videos_downsample = vid_downsample(fake_videos)
+            # ==================== update G g_iters time ==================== #
+
+            # for i in range(self.g_iters):
+
+                # ============= Generate fake video ============== #
+                # apply Gumbel Softmax
+                # if i > 1:
+                #     z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+                #     z_class = self.label_sample()
+                #     fake_videos = self.G(z, z_class)
+                #     fake_videos_sample = sample_k_frames(fake_videos, self.n_frames, self.k_sample)
+                #     fake_videos_downsample = vid_downsample(fake_videos)
 
             # =========== Train G and Gumbel noise =========== #
             # Compute loss with fake images

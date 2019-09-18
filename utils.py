@@ -21,7 +21,7 @@ def set_device(config):
             # gpus = (',').join(list(map(str, range(0, len(gpus))))) # generate a list of string number from 0 to len(config.gpus)
             gpus = list(range(len(config.gpus)))
             if config.parallel is True and len(gpus) > 1: # multi gpus
-                return 'cuda', True, gpus
+                return 'cuda:0', True, gpus
             else: # single gpu
                 return 'cuda:'+ str(gpus[0]), False, gpus
 
