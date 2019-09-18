@@ -134,7 +134,7 @@ class Trainer(object):
         step_per_epoch = len(self.data_loader)
         model_save_epoch = self.model_save_epoch * step_per_epoch
 
-        fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+        # fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
 
         # Start with trained model
         if self.pretrained_model:
@@ -264,12 +264,15 @@ class Trainer(object):
 
             # Sample images
             if (step + 1) % self.sample_step == 0:
+                self.G.eval()
                 print('Saved sample images {}_fake.png'.format(step + 1))
+                fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
                 fake_videos = self.G(fixed_z, z_class)
 
                 for i in range(fake_videos.size(0)):
                     save_image(denorm(fake_videos[i].data),
                                os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step + 1, i + 1)))
+                self.G.train()
 
             # Save model
             if (step + 1) % model_save_epoch == 0:
