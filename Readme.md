@@ -1,6 +1,32 @@
 # DVD-GAN
 This repo is an implementation of [*Efficient Video Generation on Complex Datasets*](https://arxiv.org/abs/1907.06571)
 
+## Prerequisite
+
+| **Package**    | **version**  |
+|----------------|--------------|
+| python         |  >=3.5       |
+| pytorch        |  1.12        |
+| numpy          |  1.17.2      |
+| pandas         |  0.25.1      |
+| tensorboardX   |  1.8         |
+
+**Note:** For more detail, please look up `requirements.txt`
+
+## Prepare datasets
+
+```
+sh scripts/data_prepare.sh <dataset_path>
+```
+
+## Train the model
+
+```
+sh scripts/train_model.sh <runing_mode> <dataset_path>
+```
+
+## Dataset
+
 Process UCF-101
 - Step 1 (Done): Download dataset
 - Step 2 (Done): Convert from avi to jpg files using:
@@ -16,3 +42,4 @@ python utils/ucf101_json.py annotation_dir_path
 3 Archery
 - Run step 4 only
 - The code in dataloader automatically skips the unsed videos.
+
