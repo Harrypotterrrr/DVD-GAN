@@ -28,7 +28,7 @@ def get_parameters():
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--g_lr', type=float, default=1e-4)
-    parser.add_argument('--d_lr', type=float, default=2e-4)
+    parser.add_argument('--d_lr', type=float, default=1e-4)
     parser.add_argument('--lr_decay', type=float, default=0.9999)
     parser.add_argument('--beta1', type=float, default=0.0)
     parser.add_argument('--beta2', type=float, default=0.9)
