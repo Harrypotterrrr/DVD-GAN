@@ -8,10 +8,8 @@ ANNO_PATH=$DATASET_PATH/annotations
 chmod u+x scripts/*.sh
 mkdir $DATASET_PATH
 
-cd $DATASET_PATH
-scripts/download_dataset.sh
-scripts/download_annotations.sh
-cd -
+scripts/download_dataset.sh $DATASET_PATH
+scripts/download_annotations.sh $DATA_PATH
 
 python3 utils/classify_video.py $ORIGIN_PATH $CLASSIFY_PATH 
 python3 utils/video_jpg_ucf101_hmdb51.py $CLASSIFY_PATH $VIDEO_PATH
