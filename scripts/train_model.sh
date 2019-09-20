@@ -1,4 +1,5 @@
 #!/bin/bash
+cd ..
 
 if [[ $1 == "local" ]]; then
   var="python3.6 main.py --adv_loss hinge --parallel True --gpus 0 1 --num_workers 4 \
@@ -30,14 +31,15 @@ elif [[ $1 == "vllab4" ]]; then
   echo $var
   exec $var
 elif [[ $1 == "vllab2" ]]; then
-  var="/home/potter/package/Python-3.5.2/python main.py --adv_loss wgan-gp --parallel True --gpus 1 2 3 --num_workers 16 \
-  --use_tensorboard True --ds_chn 64 --dt_chn 64 --g_chn 64 --n_frames 8 --k_sample 4 --batch_size 14 \
+  var="/home/potter/package/Python-3.5.2/python main.py --adv_loss hinge --parallel True --gpus 0 1 2 --num_workers 16 \
+  --use_tensorboard True --ds_chn 64 --dt_chn 64 --g_chn 64 --n_frames 8 --k_sample 4 --batch_size 18 \
   --n_class 1 \
   --root_path /tmp4/potter/UCF101 \
   --annotation_path annotation/ucf101_1class_01.json \
   --log_path /tmp4/potter/outputs/logs \
   --model_save_path /tmp4/potter/outputs/models \
   --sample_path /tmp4/potter/outputs/samples \
+  --d_iters 1 \
   "
   echo $var
   exec $var
