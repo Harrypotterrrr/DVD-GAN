@@ -10,19 +10,22 @@ This repo is an implementation of [*Efficient Video Generation on Complex Datase
 | numpy          |  1.17.2      |
 | pandas         |  0.25.1      |
 | tensorboardX   |  1.8         |
+| ffmpeg	 |  3.4.2	|
 
 **Note:** For more detail, please look up `requirements.txt`
 
 ## Prepare datasets
 
 ```
-sh scripts/data_prepare.sh <dataset_path>
+sudo apt install ffmpeg # important package
+chmod u+x scripts/data_prepare.sh
+scripts/data_prepare.sh <dataset_path>
 ```
 
 ## Train the model
 
 ```
-sh scripts/train_model.sh <runing_mode> <dataset_path>
+scripts/train_model.sh <runing_mode> <dataset_path>
 ```
 
 ## Dataset
