@@ -48,7 +48,7 @@ elif [[ $1 == "vllab2" ]]; then
 
 elif [[ $1 == "GCP" ]]; then
   var="python3.6 main.py --adv_loss hinge --parallel True --gpus 0 1 2 3 --num_workers 16 \
-  --use_tensorboard True --ds_chn 64 --dt_chn 64 --g_chn 64 --n_frames 8 --k_sample 4 --batch_size 12 \
+  --use_tensorboard True --ds_chn 64 --dt_chn 64 --g_chn 64 --n_frames 8 --k_sample 4 --batch_size 40 \
   --n_class 1 \
   --model_save_epoch 100 \
   --sample_step 100 \
@@ -58,7 +58,10 @@ elif [[ $1 == "GCP" ]]; then
   --model_save_path ~/outputs/models \
   --sample_path ~/outputs/samples \
   --d_iters 1 \
-  --g_iters 2"
+  --g_iters 2 \
+  --d_lr 5e-5 \
+  --g_lr 5e-5 \
+  "
   echo $var
   exec $var
 
