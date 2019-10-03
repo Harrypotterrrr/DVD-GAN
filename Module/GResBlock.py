@@ -28,11 +28,12 @@ class GResBlock(nn.Module):
                                              kernel_size, stride, padding,
                                              bias=True if bn else True))
 
-        self.skip_proj = False
-        if in_channel != out_channel or upsample_factor or downsample_factor:
-            self.conv_sc = SpectralNorm(nn.Conv2d(in_channel, out_channel,
-                                                   1, 1, 0))
-            self.skip_proj = True
+        self.skip_proj = True
+        self.conv_sc = SpectralNorm(nn.Conv2d(in_channel, out_channel, 1, 1, 0))
+
+        # if in_channel != out_channel or upsample_factor or downsample_factor:
+        #     self.conv_sc = SpectralNorm(nn.Conv2d(in_channel, out_channel, 1, 1, 0))
+        #     self.skip_proj = True
 
         if bn:
             self.CBNorm1 = ConditionalNorm(in_channel, n_class) # TODO 2 x noise.size[1]
@@ -40,6 +41,8 @@ class GResBlock(nn.Module):
 
     def forward(self, x, condition=None):
 
+        # The time dimension is combined with the batch dimension here, so each frame proceeds
+        # through the blocks independently
         BT, C, W, H = x.size()
         out = x
 
@@ -49,7 +52,6 @@ class GResBlock(nn.Module):
         out = self.activation(out)
 
         if self.upsample_factor != 1:
-            # TODO different form papers
             out = F.interpolate(out, scale_factor=self.upsample_factor)
 
         out = self.conv0(out)
