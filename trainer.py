@@ -309,9 +309,9 @@ class Trainer(object):
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
                                              (self.beta1, self.beta2))
 
-        self.g_lr_scher = StepLR(self.g_lr_scher, step_size=1000, gamma=0.9, last_epoch=-1)
-        self.ds_lr_scher = StepLR(self.ds_lr_scher, step_size=1000, gamma=0.9, last_epoch=-1)
-        self.dt_lr_scher = StepLR(self.dt_lr_scher, step_size=1000, gamma=0.9, last_epoch=-1)
+        self.g_lr_scher = StepLR(self.g_optimizer, step_size=1000, gamma=0.9, last_epoch=-1)
+        self.ds_lr_scher = StepLR(self.ds_optimizer, step_size=1000, gamma=0.9, last_epoch=-1)
+        self.dt_lr_scher = StepLR(self.dt_optimizer, step_size=1000, gamma=0.9, last_epoch=-1)
 
         # self.g_lr_scher = ExponentialLR(self.g_optimizer, mode='min',
         #                                     factor=self.lr_decay, patience=100,
