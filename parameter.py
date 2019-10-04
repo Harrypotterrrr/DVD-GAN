@@ -45,6 +45,7 @@ def get_parameters():
     parser.add_argument('--n_class', type=int, default=101)
     parser.add_argument('--k_sample', type=int, default=64)
     parser.add_argument('--n_frames', type=int, default=24)
+    parser.add_argument('--test_batch_size', type=int, default=4, help='how many batchsize for test and sample')
 
     # Path
     parser.add_argument('--image_path', type=str, default='./data')

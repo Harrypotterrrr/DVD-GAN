@@ -49,6 +49,7 @@ class Trainer(object):
         self.k_sample = config.k_sample
         self.dataset = config.dataset
         self.use_tensorboard = config.use_tensorboard
+        self.test_batch_size = config.test_batch_size
 
         # path
         self.image_path = config.image_path
@@ -80,10 +81,10 @@ class Trainer(object):
             self.load_pretrained_model()
 
     def label_sample(self):
-        label = torch.randint(low=0, high=self.n_class, size=(self.batch_size, 1))
+        label = torch.randint(low=0, high=self.n_class, size=(self.batch_size, ))
         # label = torch.LongTensor(self.batch_size, 1).random_()%self.n_class
         # one_hot= torch.zeros(self.batch_size, self.n_class).scatter_(1, label, 1)
-        return label.squeeze(1).to(self.device)  # , one_hot.to(self.device)
+        return label.to(self.device)  # , one_hot.to(self.device)
 
     def wgan_loss(self, real_img, fake_img, tag):
 
@@ -146,7 +147,8 @@ class Trainer(object):
         data_iter = iter(self.data_loader)
         self.epoch2step()
 
-        fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
+        fixed_z = torch.randn(self.test_batch_size, self.z_dim).to(self.device)
+        fixed_label = torch.randint(low=0, high=self.n_class, size=(self.test_batch_size, )).to(self.device)
 
         # Start with trained model
         if self.pretrained_model:
@@ -274,14 +276,13 @@ class Trainer(object):
 
             # Sample images
             if step % self.sample_step == 0:
-
                 self.G.eval()
-                fake_videos = self.G(fixed_z, z_class)
+                fake_videos = self.G(fixed_z, fixed_label)
                 for i in range(fake_videos.size(0)):
                     self.writer.add_image('Step %d No.%d' % (step, i + 1), make_grid(denorm(fake_videos[i].data)), step)
                     # save_image(denorm(fake_videos[i].data),
                     #            os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
-                print('Saved sample images {}_fake.png'.format(step))
+                # print('Saved sample images {}_fake.png'.format(step))
                 self.G.train()
 
             # Save model
@@ -350,8 +351,7 @@ class Trainer(object):
         # from logger import Logger
         # self.logger = Logger(self.log_path)
 
-        tf_logs_path = os.path.join(self.log_path, 'tf_logs')
-        self.writer = SummaryWriter(log_dir=tf_logs_path)
+        self.writer = SummaryWriter(log_dir=self.log_path)
 
     def load_pretrained_model(self):
         self.G.load_state_dict(torch.load(os.path.join(
