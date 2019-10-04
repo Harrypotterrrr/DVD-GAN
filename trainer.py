@@ -4,7 +4,7 @@ import datetime
 
 import torch.nn as nn
 from torchvision.utils import save_image
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ExponentialLR, ReduceLROnPlateau, StepLR
 
 from Module.Generator import Generator
 from Module.Discriminators import SpatialDiscriminator, TemporalDiscriminator
@@ -309,24 +309,29 @@ class Trainer(object):
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
                                              (self.beta1, self.beta2))
 
-        self.g_lr_scher = ReduceLROnPlateau(self.g_optimizer, mode='min',
-                                            factor=self.lr_decay, patience=100,
-                                            threshold=0.0001, threshold_mode='rel',
-                                            cooldown=0, min_lr=1e-10, eps=1e-08,
-                                            verbose=True
-                          )
-        self.ds_lr_scher = ReduceLROnPlateau(self.ds_optimizer, mode='min',
-                                             factor=self.lr_decay, patience=100,
-                                             threshold=0.0001, threshold_mode='rel',
-                                             cooldown=0, min_lr=1e-10, eps=1e-08,
-                                             verbose=True
-                                             )
-        self.dt_lr_scher = ReduceLROnPlateau(self.dt_optimizer, mode='min',
-                                             factor=self.lr_decay, patience=100,
-                                             threshold=0.0001, threshold_mode='rel',
-                                             cooldown=0, min_lr=1e-10, eps=1e-08,
-                                             verbose=True
-                                             )
+        self.g_lr_scher = StepLR(self.g_lr_scher, step_size=1000, gamma=0.9, last_epoch=-1)
+        self.ds_lr_scher = StepLR(self.ds_lr_scher, step_size=1000, gamma=0.9, last_epoch=-1)
+        self.dt_lr_scher = StepLR(self.dt_lr_scher, step_size=1000, gamma=0.9, last_epoch=-1)
+
+        # self.g_lr_scher = ExponentialLR(self.g_optimizer, mode='min',
+        #                                     factor=self.lr_decay, patience=100,
+        #                                     threshold=0.0001, threshold_mode='rel',
+        #                                     cooldown=0, min_lr=1e-10, eps=1e-08,
+        #                                     verbose=True
+        #                   )
+        # self.ds_lr_scher = ExponentialLR(self.ds_optimizer, mode='min',
+        #                                      factor=self.lr_decay, patience=100,
+        #                                      threshold=0.0001, threshold_mode='rel',
+        #                                      cooldown=0, min_lr=1e-10, eps=1e-08,
+        #                                      verbose=True
+        #                                      )
+        # self.dt_lr_scher = ExponentialLR(self.dt_optimizer, mode='min',
+        #                                      factor=self.lr_decay, patience=100,
+        #                                      threshold=0.0001, threshold_mode='rel',
+        #                                      cooldown=0, min_lr=1e-10, eps=1e-08,
+        #                                      verbose=True
+        #                                      )
+
         self.c_loss = torch.nn.CrossEntropyLoss()
 
     def build_tensorboard(self):
