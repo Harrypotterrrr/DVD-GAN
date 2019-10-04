@@ -279,7 +279,7 @@ class Trainer(object):
                 self.G.eval()
                 fake_videos = self.G(fixed_z, fixed_label)
                 for i in range(fake_videos.size(0)):
-                    self.writer.add_image('Step %d No.%d' % (step, i + 1), make_grid(denorm(fake_videos[i].data)), step)
+                    self.writer.add_image("No.%d/Step_%d" % (i + 1, step), make_grid(denorm(fake_videos[i].data)), step)
                     # save_image(denorm(fake_videos[i].data),
                     #            os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
                 # print('Saved sample images {}_fake.png'.format(step))
