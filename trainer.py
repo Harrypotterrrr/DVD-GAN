@@ -33,7 +33,7 @@ class Trainer(object):
         self.d_conv_dim = config.d_conv_dim
 
         self.lambda_gp = config.lambda_gp
-        self.total_step = config.total_step
+        self.total_epoch = config.total_epoch
         self.d_iters = config.d_iters
         self.g_iters = config.g_iters
         self.batch_size = config.batch_size
@@ -49,12 +49,16 @@ class Trainer(object):
         self.k_sample = config.k_sample
         self.dataset = config.dataset
         self.use_tensorboard = config.use_tensorboard
+
+        # path
         self.image_path = config.image_path
         self.log_path = config.log_path
         self.model_save_path = config.model_save_path
         self.sample_path = config.sample_path
-        self.log_step = config.log_step
-        self.sample_step = config.sample_step
+
+        # epoch size
+        self.log_epoch = config.log_epoch
+        self.sample_epoch = config.sample_epoch
         self.model_save_epoch = config.model_save_epoch
         self.version = config.version
 
@@ -125,15 +129,22 @@ class Trainer(object):
 
         return real_videos.to(self.device), real_labels.to(self.device)
 
+    def epoch2step(self):
+
+        self.epoch = 0
+        step_per_epoch = len(self.data_loader)
+        print("steps per epoch:", step_per_epoch)
+
+        self.total_step = self.total_epoch * step_per_epoch
+        self.log_step = self.log_epoch * step_per_epoch
+        self.sample_step = self.sample_epoch * step_per_epoch
+        self.model_save_step = self.model_save_epoch * step_per_epoch
+
     def train(self):
 
         # Data iterator
         data_iter = iter(self.data_loader)
-        step_per_epoch = len(self.data_loader)
-        self.epoch = 0
-        print("steps per epoch:", step_per_epoch)
-        total_epoch = self.total_step / step_per_epoch
-        model_save_epoch = self.model_save_epoch * step_per_epoch
+        self.epoch2step()
 
         fixed_z = torch.randn(self.batch_size, self.z_dim).to(self.device)
 
@@ -141,7 +152,7 @@ class Trainer(object):
         if self.pretrained_model:
             start = self.pretrained_model + 1
         else:
-            start = 0
+            start = 1
 
         # Start time
         print("=" * 30, "\nStart training...")
@@ -151,9 +162,18 @@ class Trainer(object):
         self.D_t.train()
         self.G.train()
 
-        for step in range(start, self.total_step):
+        for step in range(start, self.total_step + 1):
 
-            real_videos, real_labels = self.gen_real_video(data_iter)
+            # real_videos, real_labels = self.gen_real_video(data_iter)
+            try:
+                real_videos, real_labels = next(data_iter)
+            except:
+                data_iter = iter(self.data_loader)
+                real_videos, real_labels = next(data_iter)
+                self.epoch += 1
+
+            real_videos = real_videos.to(self.device)
+            real_labels = real_labels.to(self.device)
 
             # B x C x T x H x W --> B x T x C x H x W
             real_videos = real_videos.permute(0, 2, 1, 3, 4).contiguous()
@@ -240,37 +260,37 @@ class Trainer(object):
 
             # ==================== print & save part ==================== #
             # Print out log info
-            if (step + 1) % self.log_step == 0:
+            if step % self.log_step == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 start_time = time.time()
                 print(
                     "Epoch: [%d/%d], Step: [%d/%d], time: %s, ds_loss: %.4f, dt_loss: %.4f, g_s_loss: %.4f, g_t_loss: %.4f, g_loss: %.4f, lr: %.2e" %
-                    (epoch, total_epoch, step + 1, self.total_step, elapsed, ds_loss, dt_loss, g_s_loss, g_t_loss, g_loss, self.g_lr_scher.get_lr()[0])
+                    (self.epoch, self.total_epoch, step, self.total_step, elapsed, ds_loss, dt_loss, g_s_loss, g_t_loss, g_loss, self.g_lr_scher.get_lr()[0])
                 )
 
                 if self.use_tensorboard is True:
-                    write_log(self.writer, step + 1, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
+                    write_log(self.writer, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
 
             # Sample images
-            if (step + 1) % self.sample_step == 0:
+            if step % self.sample_step == 0:
                 self.G.eval()
-                print('Saved sample images {}_fake.png'.format(step + 1))
+                print('Saved sample images {}_fake.png'.format(step))
                 fake_videos = self.G(fixed_z, z_class)
 
                 for i in range(fake_videos.size(0)):
                     save_image(denorm(fake_videos[i].data),
-                               os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step + 1, i + 1)))
+                               os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
                 self.G.train()
 
             # Save model
-            if (step + 1) % model_save_epoch == 0:
+            if step % self.model_save_step == 0:
                 torch.save(self.G.state_dict(),
-                           os.path.join(self.model_save_path, '{}_G.pth'.format(step + 1)))
+                           os.path.join(self.model_save_path, '{}_G.pth'.format(step)))
                 torch.save(self.D_s.state_dict(),
-                           os.path.join(self.model_save_path, '{}_Ds.pth'.format(step + 1)))
+                           os.path.join(self.model_save_path, '{}_Ds.pth'.format(step)))
                 torch.save(self.D_t.state_dict(),
-                           os.path.join(self.model_save_path, '{}_Dt.pth'.format(step + 1)))
+                           os.path.join(self.model_save_path, '{}_Dt.pth'.format(step)))
 
     def build_model(self):
 
@@ -299,9 +319,9 @@ class Trainer(object):
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
                                              (self.beta1, self.beta2))
 
-        self.g_lr_scher = StepLR(self.g_optimizer, step_size=500, gamma=0.92)
-        self.ds_lr_scher = StepLR(self.ds_optimizer, step_size=500, gamma=0.92)
-        self.dt_lr_scher = StepLR(self.dt_optimizer, step_size=500, gamma=0.92)
+        self.g_lr_scher = StepLR(self.g_optimizer, step_size=500, gamma=0.9)
+        self.ds_lr_scher = StepLR(self.ds_optimizer, step_size=500, gamma=0.9)
+        self.dt_lr_scher = StepLR(self.dt_optimizer, step_size=500, gamma=0.9)
 
         # self.g_lr_scher = ExponentialLR(self.g_optimizer, mode='min',
         #                                     factor=self.lr_decay, patience=100,
