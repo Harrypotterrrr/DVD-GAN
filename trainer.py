@@ -3,7 +3,7 @@ import torch
 import datetime
 
 import torch.nn as nn
-from torchvision.utils import save_image
+from torchvision.utils import save_image, make_grid
 from torch.optim.lr_scheduler import ExponentialLR, ReduceLROnPlateau, StepLR
 
 from Module.Generator import Generator
@@ -274,13 +274,14 @@ class Trainer(object):
 
             # Sample images
             if step % self.sample_step == 0:
-                self.G.eval()
-                print('Saved sample images {}_fake.png'.format(step))
-                fake_videos = self.G(fixed_z, z_class)
 
+                self.G.eval()
+                fake_videos = self.G(fixed_z, z_class)
                 for i in range(fake_videos.size(0)):
-                    save_image(denorm(fake_videos[i].data),
-                               os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
+                    self.writer.add_image('Step %d No.%d' % (step, i + 1), make_grid(denorm(fake_videos[i].data)), step)
+                    # save_image(denorm(fake_videos[i].data),
+                    #            os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
+                print('Saved sample images {}_fake.png'.format(step))
                 self.G.train()
 
             # Save model
