@@ -304,22 +304,23 @@ class Trainer(object):
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 start_time = time.time()
-                print(
-                    "Epoch: [%d/%d], Step: [%d/%d], time: %s, ds_loss: %.4f, dt_loss: %.4f, g_s_loss: %.4f, g_t_loss: %.4f, g_loss: %.4f, lr: %.2e" %
+                log_str = "Epoch: [%d/%d], Step: [%d/%d], time: %s, ds_loss: %.4f, dt_loss: %.4f, g_s_loss: %.4f, g_t_loss: %.4f, g_loss: %.4f, lr: %.2e" % \
                     (self.epoch, self.total_epoch, step, self.total_step, elapsed, ds_loss, dt_loss, g_s_loss, g_t_loss, g_loss, self.g_lr_scher.get_lr()[0])
-                )
 
                 if self.use_tensorboard is True:
-                    write_log(self.writer, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
+                    write_log(self.writer, log_str, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
+                else:
+                    print(log_str)
 
             # Sample images
             if step % self.sample_step == 0:
                 self.G.eval()
                 fake_videos = self.G(fixed_z, fixed_label)
                 for i in range(fake_videos.size(0)):
-                    self.writer.add_image("No.%d/Step_%d" % (i + 1, step), make_grid(denorm(fake_videos[i].data)), step)
-                    # save_image(denorm(fake_videos[i].data),
-                    #            os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
+                    if self.use_tensorboard is True:
+                        self.writer.add_image("No.%d/Step_%d" % (i + 1, step), make_grid(denorm(fake_videos[i].data)), step)
+                    else:
+                        save_image(denorm(fake_videos[i].data), os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
                 # print('Saved sample images {}_fake.png'.format(step))
                 self.G.train()
 

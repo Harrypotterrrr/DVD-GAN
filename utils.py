@@ -62,7 +62,7 @@ def sample_k_frames(data, video_length, k_sample):
     srt, idx = frame_idx[:k_sample].sort()
     return data[:, srt, :, :, :]
 
-def write_log(writer, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss):
+def write_log(writer, log_str, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss):
 
     writer.add_scalar('data/ds_loss_real', ds_loss_real.item(), step)
     writer.add_scalar('data/ds_loss_fake', ds_loss_fake.item(), step)
@@ -71,6 +71,8 @@ def write_log(writer, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, d
     writer.add_scalar('data/dt_loss_fake', dt_loss_fake.item(), step)
     writer.add_scalar('data/dt_loss', dt_loss.item(), step)
     writer.add_scalar('data/g_loss_fake', g_loss.item(), step)
+
+    writer.add_text('logs', log_str, step)
 
 def vid_downsample(data):
     out = data
