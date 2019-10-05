@@ -4,7 +4,7 @@ import datetime
 
 import torch.nn as nn
 from torchvision.utils import save_image, make_grid
-from torch.optim.lr_scheduler import ExponentialLR, ReduceLROnPlateau, StepLR
+from torch.optim.lr_scheduler import ExponentialLR, ReduceLROnPlateau, StepLR, MultiStepLR
 
 from Module.Generator import Generator
 from Module.Discriminators import SpatialDiscriminator, TemporalDiscriminator
@@ -148,6 +148,10 @@ class Trainer(object):
             self.g_lr_scher = ExponentialLR(self.g_optimizer, gamma=0.9999)
             self.ds_lr_scher = ExponentialLR(self.ds_optimizer, gamma=0.9999)
             self.dt_lr_scher = ExponentialLR(self.dt_optimizer, gamma=0.9999)
+        elif self.lr_schr == 'multi':
+            self.g_lr_scher = MultiStepLR(self.g_optimizer, [200, 2000, 10000, 50000], gamma=0.5)
+            self.ds_lr_scher = MultiStepLR(self.ds_optimizer, [200, 2000, 10000, 50000], gamma=0.5)
+            self.dt_lr_scher = MultiStepLR(self.dt_optimizer, [200, 2000, 10000, 50000], gamma=0.5)
         else:
             self.g_lr_scher = ReduceLROnPlateau(self.g_optimizer, mode='min',
                                                 factor=self.lr_decay, patience=100,
