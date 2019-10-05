@@ -31,6 +31,7 @@ class Trainer(object):
         self.n_frames = config.n_frames
         self.g_conv_dim = config.g_conv_dim
         self.d_conv_dim = config.d_conv_dim
+        self.lr_schr = config.lr_schr
 
         self.lambda_gp = config.lambda_gp
         self.total_epoch = config.total_epoch
@@ -129,6 +130,43 @@ class Trainer(object):
             self.epoch += 1
 
         return real_videos.to(self.device), real_labels.to(self.device)
+
+    def select_opt_schr(self):
+
+        self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr,
+                                            (self.beta1, self.beta2))
+        self.ds_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_s.parameters()), self.d_lr,
+                                             (self.beta1, self.beta2))
+        self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
+                                             (self.beta1, self.beta2))
+
+        if self.lr_schr == 'step':
+            self.g_lr_scher = StepLR(self.g_optimizer, step_size=500, gamma=0.98)
+            self.ds_lr_scher = StepLR(self.ds_optimizer, step_size=500, gamma=0.98)
+            self.dt_lr_scher = StepLR(self.dt_optimizer, step_size=500, gamma=0.98)
+        elif self.lr_schr == 'exp':
+            self.g_lr_scher = ExponentialLR(self.g_optimizer, gamma=0.9999)
+            self.ds_lr_scher = ExponentialLR(self.ds_optimizer, gamma=0.9999)
+            self.dt_lr_scher = ExponentialLR(self.dt_optimizer, gamma=0.9999)
+        else:
+            self.g_lr_scher = ReduceLROnPlateau(self.g_optimizer, mode='min',
+                                                factor=self.lr_decay, patience=100,
+                                                threshold=0.0001, threshold_mode='rel',
+                                                cooldown=0, min_lr=1e-10, eps=1e-08,
+                                                verbose=True
+                              )
+            self.ds_lr_scher = ReduceLROnPlateau(self.ds_optimizer, mode='min',
+                                                 factor=self.lr_decay, patience=100,
+                                                 threshold=0.0001, threshold_mode='rel',
+                                                 cooldown=0, min_lr=1e-10, eps=1e-08,
+                                                 verbose=True
+                                                 )
+            self.dt_lr_scher = ReduceLROnPlateau(self.dt_optimizer, mode='min',
+                                                 factor=self.lr_decay, patience=100,
+                                                 threshold=0.0001, threshold_mode='rel',
+                                                 cooldown=0, min_lr=1e-10, eps=1e-08,
+                                                 verbose=True
+                                                 )
 
     def epoch2step(self):
 
@@ -313,36 +351,7 @@ class Trainer(object):
         # self.G.apply(weights_init)
         # self.D.apply(weights_init)
 
-        # Loss and optimizer
-        self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr,
-                                            (self.beta1, self.beta2))
-        self.ds_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_s.parameters()), self.d_lr,
-                                             (self.beta1, self.beta2))
-        self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
-                                             (self.beta1, self.beta2))
-
-        self.g_lr_scher = StepLR(self.g_optimizer, step_size=500, gamma=0.9)
-        self.ds_lr_scher = StepLR(self.ds_optimizer, step_size=500, gamma=0.9)
-        self.dt_lr_scher = StepLR(self.dt_optimizer, step_size=500, gamma=0.9)
-
-        # self.g_lr_scher = ExponentialLR(self.g_optimizer, mode='min',
-        #                                     factor=self.lr_decay, patience=100,
-        #                                     threshold=0.0001, threshold_mode='rel',
-        #                                     cooldown=0, min_lr=1e-10, eps=1e-08,
-        #                                     verbose=True
-        #                   )
-        # self.ds_lr_scher = ExponentialLR(self.ds_optimizer, mode='min',
-        #                                      factor=self.lr_decay, patience=100,
-        #                                      threshold=0.0001, threshold_mode='rel',
-        #                                      cooldown=0, min_lr=1e-10, eps=1e-08,
-        #                                      verbose=True
-        #                                      )
-        # self.dt_lr_scher = ExponentialLR(self.dt_optimizer, mode='min',
-        #                                      factor=self.lr_decay, patience=100,
-        #                                      threshold=0.0001, threshold_mode='rel',
-        #                                      cooldown=0, min_lr=1e-10, eps=1e-08,
-        #                                      verbose=True
-        #                                      )
+        self.select_opt_schr()
 
         self.c_loss = torch.nn.CrossEntropyLoss()
 
