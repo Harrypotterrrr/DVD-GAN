@@ -149,28 +149,28 @@ class Trainer(object):
             self.ds_lr_scher = ExponentialLR(self.ds_optimizer, gamma=0.9999)
             self.dt_lr_scher = ExponentialLR(self.dt_optimizer, gamma=0.9999)
         elif self.lr_schr == 'multi':
-            self.g_lr_scher = MultiStepLR(self.g_optimizer, [200, 2000, 10000, 50000], gamma=0.5)
-            self.ds_lr_scher = MultiStepLR(self.ds_optimizer, [200, 2000, 10000, 50000], gamma=0.5)
-            self.dt_lr_scher = MultiStepLR(self.dt_optimizer, [200, 2000, 10000, 50000], gamma=0.5)
+            self.g_lr_scher = MultiStepLR(self.g_optimizer, [10000, 30000], gamma=0.3)
+            self.ds_lr_scher = MultiStepLR(self.ds_optimizer, [10000, 30000], gamma=0.3)
+            self.dt_lr_scher = MultiStepLR(self.dt_optimizer, [10000, 30000], gamma=0.3)
         else:
             self.g_lr_scher = ReduceLROnPlateau(self.g_optimizer, mode='min',
                                                 factor=self.lr_decay, patience=100,
                                                 threshold=0.0001, threshold_mode='rel',
                                                 cooldown=0, min_lr=1e-10, eps=1e-08,
                                                 verbose=True
-                              )
+                            )
             self.ds_lr_scher = ReduceLROnPlateau(self.ds_optimizer, mode='min',
                                                  factor=self.lr_decay, patience=100,
                                                  threshold=0.0001, threshold_mode='rel',
                                                  cooldown=0, min_lr=1e-10, eps=1e-08,
                                                  verbose=True
-                                                 )
+                             )
             self.dt_lr_scher = ReduceLROnPlateau(self.dt_optimizer, mode='min',
                                                  factor=self.lr_decay, patience=100,
                                                  threshold=0.0001, threshold_mode='rel',
                                                  cooldown=0, min_lr=1e-10, eps=1e-08,
                                                  verbose=True
-                                                 )
+                             )
 
     def epoch2step(self):
 
@@ -313,8 +313,7 @@ class Trainer(object):
 
                 if self.use_tensorboard is True:
                     write_log(self.writer, log_str, step, ds_loss_real, ds_loss_fake, ds_loss, dt_loss_real, dt_loss_fake, dt_loss, g_loss)
-                else:
-                    print(log_str)
+                print(log_str)
 
             # Sample images
             if step % self.sample_step == 0:
