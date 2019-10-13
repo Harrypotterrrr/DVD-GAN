@@ -37,15 +37,19 @@ class Generator(nn.Module):
 
         self.conv = nn.ModuleList([
             ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 8 * ch], kernel_sizes=[3, 3], n_layers=2),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2),
             ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 8 * ch], kernel_sizes=[3, 3], n_layers=2),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2),
             ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 8 * ch], kernel_sizes=[3, 3], n_layers=2),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
             GResBlock(8 * ch, 4 * ch, n_class=in_dim * 2),
             ConvGRU(4 * ch, hidden_sizes=[4 * ch, 8 * ch, 4 * ch], kernel_sizes=[3, 5, 5], n_layers=3),
+            # ConvGRU(4 * ch, hidden_sizes=[4 * ch, 4 * ch], kernel_sizes=[3, 5], n_layers=2),
             GResBlock(4 * ch, 4 * ch, n_class=in_dim * 2, upsample_factor=1),
             GResBlock(4 * ch, 2 * ch, n_class=in_dim * 2)
         ])
