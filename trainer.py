@@ -320,11 +320,13 @@ class Trainer(object):
             if step % self.sample_step == 0:
                 self.G.eval()
                 fake_videos = self.G(fixed_z, fixed_label)
-                for i in range(fake_videos.size(0)):
-                    if self.use_tensorboard is True:
-                        self.writer.add_image("No.%d/Step_%d" % (i + 1, step), make_grid(denorm(fake_videos[i].data)), step)
-                    else:
-                        save_image(denorm(fake_videos[i].data), os.path.join(self.sample_path, 'step_{}_fake_{}.png'.format(step, i + 1)))
+
+                for i in range(self.n_class):
+                    for j in range(self.test_batch_size):
+                        if self.use_tensorboard is True:
+                            self.writer.add_image("Class_%d/No.%d/Step_%d" % (i, j, step), make_grid(denorm(fake_videos[i].data)), step)
+                        else:
+                            save_image(denorm(fake_videos[i].data), os.path.join(self.sample_path, "Class_%d/No.%d/Step_%d" % (i, j, step)))
                 # print('Saved sample images {}_fake.png'.format(step))
                 self.G.train()
 
