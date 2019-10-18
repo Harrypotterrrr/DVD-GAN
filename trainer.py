@@ -139,8 +139,11 @@ class Trainer(object):
                                              (self.beta1, self.beta2))
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
                                              (self.beta1, self.beta2))
-
-        if self.lr_schr == 'step':
+        if self.lr_schr == 'const':
+            self.g_lr_scher = StepLR(self.g_optimizer, step_size=10000, gamma=1)
+            self.ds_lr_scher = StepLR(self.ds_optimizer, step_size=10000, gamma=1)
+            self.dt_lr_scher = StepLR(self.dt_optimizer, step_size=10000, gamma=1)
+        elif self.lr_schr == 'step':
             self.g_lr_scher = StepLR(self.g_optimizer, step_size=500, gamma=0.98)
             self.ds_lr_scher = StepLR(self.ds_optimizer, step_size=500, gamma=0.98)
             self.dt_lr_scher = StepLR(self.dt_optimizer, step_size=500, gamma=0.98)
@@ -324,9 +327,9 @@ class Trainer(object):
                 for i in range(self.n_class):
                     for j in range(self.test_batch_size):
                         if self.use_tensorboard is True:
-                            self.writer.add_image("Class_%d/No.%d/Step_%d" % (i, j, step), make_grid(denorm(fake_videos[i].data)), step)
+                            self.writer.add_image("Class_%d_No.%d/Step_%d" % (i, j, step), make_grid(denorm(fake_videos[i * self.test_batch_size + j].data)), step)
                         else:
-                            save_image(denorm(fake_videos[i].data), os.path.join(self.sample_path, "Class_%d/No.%d/Step_%d" % (i, j, step)))
+                            save_image(denorm(fake_videos[i * self.test_batch_size + j].data), os.path.join(self.sample_path, "Class_%d_No.%d_Step_%d" % (i, j, step)))
                 # print('Saved sample images {}_fake.png'.format(step))
                 self.G.train()
 

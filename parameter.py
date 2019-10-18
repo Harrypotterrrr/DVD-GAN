@@ -19,7 +19,7 @@ def get_parameters():
     parser.add_argument('--g_conv_dim', type=int, default=64)
     parser.add_argument('--d_conv_dim', type=int, default=64)
     parser.add_argument('--lambda_gp', type=float, default=10)
-    parser.add_argument('--lr_schr', type=str, default='step', choices=['step', 'exp', 'multi', 'reduce'])
+    parser.add_argument('--lr_schr', type=str, default='const', choices=['const', 'step', 'exp', 'multi', 'reduce'])
     parser.add_argument('--version', type=str, default='')
 
     # Training setting
