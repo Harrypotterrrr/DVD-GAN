@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from torch.nn import init
 
 from Module.Normalization import ConditionalNorm, SpectralNorm
+
+from utils import *
 # from Module.Attention import SelfAttention
 # from Module.GResBlock import GResBlock
 
@@ -235,11 +237,11 @@ class SpatialDiscriminator(nn.Module):
 
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
 
-        self.embed = nn.Embedding(n_class, 16*chn)
-        self.embed.weight.data.uniform_(-0.1, 0.1)
-        self.embed = SpectralNorm(self.embed)
+        # self.embed = nn.Embedding(n_class, 16*chn)
+        # self.embed.weight.data.uniform_(-0.1, 0.1)
+        # self.embed = SpectralNorm(self.embed)
 
-    def forward(self, x, class_id):
+    def forward(self, x, class_id=None):
         # reshape input tensor from BxTxCxHxW to BTxCxHxW
         batch_size, T, C, W, H = x.size()
 
@@ -270,25 +272,37 @@ class SpatialDiscriminator(nn.Module):
 
         # sum on H and W axis
         out = out.sum(2)
+
+        # print(out.size())
         # sum on T axis
         # out = out.sum(1)
 
         out_linear = self.linear(out).squeeze(1)
+        # print(out_linear)
+
+
+        out_linear = out_linear.view(batch_size, -1)
+
+        # print(out_linear)
+
+        out_linear = out_linear.sum(1)
+
+        # print(out_linear)
 
         # repeat class_id for each frame
         # TODO: test in case multi-class
-        class_id = class_id.view(-1, 1).repeat(1, T).view(-1)
+        # class_id = class_id.view(-1, 1).repeat(1, T).view(-1)
+        #
+        # embed = self.embed(class_id)
 
-        embed = self.embed(class_id)
-
-        prod = (out * embed).sum(1)
+        # prod = (out * embed).sum(1)
 
         # out_linear = out_linear.view(-1, T)
         # prod = prod.view(-1, T)
 
         # score = (out_linear + prod).sum(1)
 
-        return out_linear + prod
+        return out_linear # + prod
 
 
 def conv3x3x3(in_planes, out_planes, stride=1):
@@ -393,11 +407,11 @@ class TemporalDiscriminator(nn.Module):
 
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
 
-        self.embed = nn.Embedding(n_class, 16*chn)
-        self.embed.weight.data.uniform_(-0.1, 0.1)
-        self.embed = SpectralNorm(self.embed)
+        # self.embed = nn.Embedding(n_class, 16*chn)
+        # self.embed.weight.data.uniform_(-0.1, 0.1)
+        # self.embed = SpectralNorm(self.embed)
 
-    def forward(self, x, class_id):
+    def forward(self, x, class_id=None):
         # pre-process with avg_pool2d to reduce tensor size
         # B, T, C, H, W = x.size()
         # x = F.avg_pool2d(x.view(B * T, C, H, W), kernel_size=2)
@@ -422,29 +436,44 @@ class TemporalDiscriminator(nn.Module):
 
 
         # out = out.permute(0, 2, 1, 3, 4).contiguous()
+        # print(out.size())
         out = out.view(out.size(0), out.size(1), -1)
         # out = out.view(batch_size, T, out.size(2), -1) # B x T x C x H x W
 
+        # print(out.size())
+
         # sum on H and W axis
         out = out.sum(2)
+
+        # print(out.size())
         # sum on T axis
         # out = out.sum(1)
         out_linear = self.linear(out).squeeze(1)
 
+        # print('out linear', out_linear.size())
+
+        out_linear = out_linear.view(batch_size, -1)
+
+        # print(out_linear)
+
+        out_linear = out_linear.sum(1)
+
+        # print(out_linear)
+
         # repeat class_id for each frame
         # TODO: test in case multi-class
-        class_id = class_id.view(-1, 1).repeat(1, T).view(-1)
+        # class_id = class_id.view(-1, 1).repeat(1, T).view(-1)
 
-        embed = self.embed(class_id)
+        # embed = self.embed(class_id)
 
-        prod = (out * embed).sum(1)
+        # prod = (out * embed).sum(1)
 
         # out_linear = out_linear.view(-1, T)
         # prod = prod.view(-1, T)
 
         # score = (out_linear + prod).sum(1)
 
-        return out_linear + prod
+        return out_linear #+ prod
 ########################################################################################
 
 
@@ -638,7 +667,7 @@ if __name__ == '__main__':
     n_class = 4
     n_chn = 4
 
-    model = TemporalDiscriminator(chn=n_chn, n_class=n_class)
+    model = SpatialDiscriminator(chn=n_chn, n_class=n_class)
     model.cuda()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0, 0.9),
@@ -647,6 +676,10 @@ if __name__ == '__main__':
         data = torch.randn((batch_size, n_frames, 3, 64, 64)).cuda()
 
         label = torch.randint(0, n_class, (batch_size,)).cuda()
+
+
+        # data = vid_downsample(data)
+
         # B, T, C, H, W = data.size()
         # data = F.avg_pool2d(data.view(B * T, C, H, W), kernel_size=2)
         # _, _, H, W = data.size()
@@ -656,6 +689,7 @@ if __name__ == '__main__':
         # data = data.transpose(1, 2).contiguous()
 
         out = model(data, label)
+
         loss = torch.mean(out)
         print(loss.data)
 
