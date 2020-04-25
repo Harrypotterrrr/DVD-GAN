@@ -18,6 +18,7 @@ class ConvGRUCell(nn.Module):
         self.out_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, padding=padding)
         self.activation = activation
 
+
         init.orthogonal_(self.reset_gate.weight)
         init.orthogonal_(self.update_gate.weight)
         init.orthogonal_(self.out_gate.weight)
@@ -48,7 +49,8 @@ class ConvGRUCell(nn.Module):
 
         update = self.activation(self.update_gate(stacked_inputs))
         reset = self.activation(self.reset_gate(stacked_inputs))
-        out_inputs = torch.tanh(self.out_gate(torch.cat([x, prev_state * reset], dim=1)))
+        # out_inputs = torch.tanh(self.out_gate(torch.cat([x, prev_state * reset], dim=1)))
+        out_inputs = torch.relu(self.out_gate(torch.cat([x, prev_state * reset], dim=1)))
         new_state = prev_state * (1 - update) + out_inputs * update
 
         return new_state
