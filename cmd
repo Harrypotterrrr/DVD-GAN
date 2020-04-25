@@ -1,0 +1,23 @@
+python main.py \
+--adv_loss hinge \
+--gpus 0 1 \
+--num_workers 4 \
+--use_tensorboard True \
+--ds_chn 48 \
+--dt_chn 48 \
+--g_chn 48 \
+--n_frames 16 \
+--k_sample 8 \
+--n_class 2 \
+--batch_size 8 \
+--g_lr 1e-4 \
+--d_lr 5e-4 \
+--lr_schr const \
+--root_path /mnt/sda1/Datasets/UCF101 \
+--log_path /mnt/sda1/DVD-GAN/logs \
+--model_save_path /mnt/sda1/DVD-GAN/models \
+--sample_path /mnt/sda1/DVD-GAN/samples \
+--train_crop center \
+--d_iters 1 \
+--test_batch_size 4 \
+--parallel True
