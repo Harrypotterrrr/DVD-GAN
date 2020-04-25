@@ -134,7 +134,7 @@ class Trainer(object):
     def select_opt_schr(self):
 
         self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr,
-                                            (self.beta1, self.beta2))
+                                            (self.beta1, self.beta2), weight_decay=0.9999)
         self.ds_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_s.parameters()), self.d_lr,
                                              (self.beta1, self.beta2))
         self.dt_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D_t.parameters()), self.d_lr,
@@ -190,11 +190,13 @@ class Trainer(object):
 
         # Data iterator
         data_iter = iter(self.data_loader)
+        
+
         self.epoch2step()
 
         fixed_z = torch.randn(self.test_batch_size * self.n_class, self.z_dim).to(self.device)
         # fixed_label = torch.randint(low=0, high=self.n_class, size=(self.test_batch_size, )).to(self.device)
-        fixed_label = torch.tensor([i for i in range(self.n_class) for j in range(self.test_batch_size)])
+        fixed_label = torch.tensor([i for i in range(self.n_class) for j in range(self.test_batch_size)]).to(self.device)
 
         # Start with trained model
         if self.pretrained_model:
@@ -236,6 +238,7 @@ class Trainer(object):
                 # apply Gumbel Softmax
                 z = torch.randn(self.batch_size, self.z_dim).to(self.device)
                 z_class = self.label_sample()
+
                 fake_videos = self.G(z, z_class)
 
                 # ================== Train D_s ================== #
@@ -250,7 +253,7 @@ class Trainer(object):
                 self.reset_grad()
                 ds_loss.backward()
                 self.ds_optimizer.step()
-                self.ds_lr_scher.step()
+                # self.ds_lr_scher.step()
 
                 # ================== Train D_t ================== #
                 real_videos_downsample = vid_downsample(real_videos)
@@ -266,7 +269,7 @@ class Trainer(object):
                 self.reset_grad()
                 dt_loss.backward()
                 self.dt_optimizer.step()
-                self.dt_lr_scher.step()
+                # self.dt_lr_scher.step()
 
                 # ================== Use wgan_gp ================== #
                 # if self.adv_loss == "wgan_gp":
@@ -295,8 +298,10 @@ class Trainer(object):
             # Compute loss with fake images
             g_s_out_fake = self.D_s(fake_videos_sample, z_class)  # Spatial Discrimminator loss
             g_t_out_fake = self.D_t(fake_videos_downsample, z_class)  # Temporal Discriminator loss
-            g_s_loss = self.calc_loss(g_s_out_fake, True)
-            g_t_loss = self.calc_loss(g_t_out_fake, True)
+            # g_s_loss = self.calc_loss(g_s_out_fake, True)
+            # g_t_loss = self.calc_loss(g_t_out_fake, True)
+            g_s_loss = - g_s_out_fake.mean()
+            g_t_loss = - g_t_out_fake.mean()
             g_loss = g_s_loss + g_t_loss
             # g_loss = self.calc_loss(g_s_out_fake, True) + self.calc_loss(g_t_out_fake, True)
 
@@ -304,6 +309,9 @@ class Trainer(object):
             self.reset_grad()
             g_loss.backward()
             self.g_optimizer.step()
+
+            self.ds_lr_scher.step()
+            self.dt_lr_scher.step()
             self.g_lr_scher.step()
 
             # ==================== print & save part ==================== #
@@ -322,7 +330,8 @@ class Trainer(object):
             # Sample images
             if step % self.sample_step == 0:
                 self.G.eval()
-                fake_videos = self.G(fixed_z, fixed_label)
+                with torch.no_grad():
+                    fake_videos = self.G(fixed_z, fixed_label)
 
                 for i in range(self.n_class):
                     for j in range(self.test_batch_size):
