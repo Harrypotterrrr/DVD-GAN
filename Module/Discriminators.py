@@ -219,25 +219,34 @@ class SpatialDiscriminator(nn.Module):
     def __init__(self, chn=128, n_class=4):
         super().__init__()
 
-        self.pre_conv = nn.Sequential(SpectralNorm(nn.Conv2d(3, 2*chn, 3, padding=1), ),
-                                      nn.ReLU(),
-                                      SpectralNorm(nn.Conv2d(2*chn, 2*chn, 3, padding=1), ),
-                                      nn.AvgPool2d(2))
-        self.pre_skip = SpectralNorm(nn.Conv2d(3, 2*chn, 1))
+        # self.pre_conv = nn.Sequential(SpectralNorm(nn.Conv2d(3, 2*chn, 3, padding=1), ),
+        #                               nn.ReLU(),
+        #                               SpectralNorm(nn.Conv2d(2*chn, 2*chn, 3, padding=1), ),
+        #                               nn.AvgPool2d(2))
+        # self.pre_skip = SpectralNorm(nn.Conv2d(3, 2*chn, 1))
+        #
+        # self.conv1 = GBlock(2*chn, 4*chn, bn=False, upsample=False, downsample=True)
+        # self.attn = SelfAttention(4*chn)
+        # self.conv2 = nn.Sequential(
+        #     GBlock(4*chn, 8*chn, bn=False, upsample=False, downsample=True),
+        #     GBlock(8*chn, 16*chn, bn=False, upsample=False, downsample=True),
+        #     GBlock(16*chn, 16*chn, bn=False, upsample=False, downsample=True)
+        # )
 
-        self.conv1 = GBlock(2*chn, 4*chn, bn=False, upsample=False, downsample=True)
-        self.attn = SelfAttention(4*chn)
-        self.conv2 = nn.Sequential(
-            GBlock(4*chn, 8*chn, bn=False, upsample=False, downsample=True),
+        self.conv = nn.Sequential(
+            GBlock(3, 2 * chn, bn=False, upsample=False, downsample=True),
+            GBlock(2 * chn, 4 * chn, bn=False, upsample=False, downsample=True),
+            GBlock(4 * chn, 8 * chn, bn=False, upsample=False, downsample=True),
             GBlock(8*chn, 16*chn, bn=False, upsample=False, downsample=True),
             GBlock(16*chn, 16*chn, bn=False, upsample=False, downsample=True)
         )
-
         self.linear = SpectralNorm(nn.Linear(16*chn, 1))
 
         self.embed = nn.Embedding(n_class, 16*chn)
         self.embed.weight.data.uniform_(-0.1, 0.1)
         self.embed = SpectralNorm(self.embed)
+
+
 
     def forward(self, x, class_id):
         # reshape input tensor from BxTxCxHxW to BTxCxHxW
@@ -245,24 +254,25 @@ class SpatialDiscriminator(nn.Module):
 
         x = x.view(batch_size * T, C, H, W)
 
-        out = self.pre_conv(x)
-        out = out + self.pre_skip(F.avg_pool2d(x, 2))
+        # out = self.pre_conv(x)
+        # out = out + self.pre_skip(F.avg_pool2d(x, 2))
 
 
         # reshape back to B x T x C x H x W
 
         # out = out.view(batch_size, T, -1, H // 2, W // 2)
 
-        out = self.conv1(out) # B x T x C x H x W
+        # out = self.conv1(out) # B x T x C x H x W
         # out = out.permute(0, 2, 1, 3, 4) # B x C x T x H x W
 
-        out = self.attn(out) # B x C x T x H x W
+        # out = self.attn(out) # B x C x T x H x W
         # out = out.permute(0, 2, 1, 3, 4).contiguous() # B x T x C x H x W
 
-        out = self.conv2(out)
+        # out = self.conv2(out)
+
+        out = self.conv(x)
 
         out = F.relu(out)
-
 
         # out = out.permute(0, 2, 1, 3, 4).contiguous()
         out = out.view(out.size(0), out.size(1), -1)
@@ -277,9 +287,13 @@ class SpatialDiscriminator(nn.Module):
 
         # repeat class_id for each frame
         # TODO: test in case multi-class
-        class_id = class_id.view(-1, 1).repeat(1, T).view(-1)
+        class_id = class_id.unsqueeze(1)
+        class_id = class_id.repeat(1, T)
+        class_id = class_id.view(-1)
 
+        # class_id = class_id.view(-1, 1).repeat(1, T).view(-1)
         embed = self.embed(class_id)
+
 
         prod = (out * embed).sum(1)
 
@@ -373,17 +387,22 @@ class TemporalDiscriminator(nn.Module):
 
         gain = 2 ** 0.5
 
-        self.pre_conv = nn.Sequential(
-            SpectralNorm(nn.Conv3d(3, 2*chn, 3, padding=1)),
-            nn.ReLU(),
-            SpectralNorm(nn.Conv3d(2*chn, 2*chn, 3, padding=1)),
-            nn.AvgPool3d(2)
+        # self.pre_conv = nn.Sequential(
+        #     SpectralNorm(nn.Conv3d(3, 2*chn, 3, padding=1)),
+        #     nn.ReLU(),
+        #     SpectralNorm(nn.Conv3d(2*chn, 2*chn, 3, padding=1)),
+        #     nn.AvgPool3d(2)
+        # )
+        # self.pre_skip = SpectralNorm(nn.Conv3d(3, 2*chn, 1))
+
+        self.res3d = nn.Sequential(
+            Res3dBlock(3, 2 * chn, bn=False, upsample=False, downsample=True),
+            Res3dBlock(2 * chn, 4 * chn, bn=False, upsample=False, downsample=True)
         )
-        self.pre_skip = SpectralNorm(nn.Conv3d(3, 2*chn, 1))
 
-        self.res3d = Res3dBlock(2*chn, 4*chn, bn=False, upsample=False, downsample=True)
-
-        self.self_attn = SelfAttention(4*chn)
+        # self.res3d = Res3dBlock(2*chn, 4*chn, bn=False, upsample=False, downsample=True)
+        #
+        # self.self_attn = SelfAttention(4*chn)
 
         self.conv = nn.Sequential(
             GBlock(4*chn, 8*chn, bn=False, upsample=False, downsample=True),
@@ -404,17 +423,16 @@ class TemporalDiscriminator(nn.Module):
         # _, _, H, W = x.size()
         # x = x.view(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous() # B x C x T x W x H
 
-        out = self.pre_conv(x)
-        out = out + self.pre_skip(F.avg_pool3d(x, 2))
-        out = self.res3d(out) # B x C x T x W x H
-
+        # out = self.pre_conv(x)
+        # out = out + self.pre_skip(F.avg_pool3d(x, 2))
+        out = self.res3d(x) # B x C x T x W x H
 
         #reshape to BTxCxWxH
         out = out.permute(0, 2, 1, 3, 4).contiguous()
         B, T, C, W, H = out.size()
         out = out.view(B*T, C, W, H)
 
-        out = self.self_attn(out)
+        # out = self.self_attn(out)
         # out = out.permute(0, 2, 1, 3, 4).contiguous() # B x T x C x W x H
 
         out = self.conv(out)
@@ -433,11 +451,15 @@ class TemporalDiscriminator(nn.Module):
 
         # repeat class_id for each frame
         # TODO: test in case multi-class
-        class_id = class_id.view(-1, 1).repeat(1, T).view(-1)
+        class_id = class_id.unsqueeze(1)
+        class_id = class_id.repeat(1, T)
+        class_id = class_id.view(-1)
+
 
         embed = self.embed(class_id)
 
         prod = (out * embed).sum(1)
+
 
         # out_linear = out_linear.view(-1, T)
         # prod = prod.view(-1, T)
