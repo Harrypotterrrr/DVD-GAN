@@ -5,9 +5,10 @@ from torch.nn import functional as F
 from tensorboardX import SummaryWriter
 
 from Module.GResBlock import GResBlock
-from Module.Normalization import SpectralNorm
+from Module.Normalization import ConditionalNorm, SpectralNorm
 from Module.ConvGRU import ConvGRU
-from Module.Attention import SelfAttention, SeparableAttn
+
+# from Module.Attention import SelfAttention, SeparableAttn
 # from Module.CrossReplicaBN import ScaledCrossReplicaBatchNorm2d
 
 class Generator(nn.Module):
@@ -24,7 +25,8 @@ class Generator(nn.Module):
 
         self.embedding = nn.Embedding(n_class, in_dim)
 
-        self.affine_transfrom = nn.Linear(in_dim * 2, latent_dim * latent_dim * 8 * ch)
+        # self.affine_transfrom = nn.Linear(in_dim * 2, latent_dim * latent_dim * 8 * ch)
+        self.affine_transform = nn.Conv2d(15, 8 * ch, kernel_size=(1, 1))
 
         # self.self_attn = SelfAttention(8 * ch)
 
@@ -35,25 +37,48 @@ class Generator(nn.Module):
         #                            GResBlock(4 * ch, 2 * ch, n_class=in_dim * 2)])
         # self.convGRU = ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3)
 
+        # self.conv = nn.ModuleList([
+        #     # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+        #     ConvGRU(8 * ch, hidden_sizes=[8 * ch], kernel_sizes=[3], n_layers=1),
+        #     GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
+        #     GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2),
+        #     # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+        #     ConvGRU(8 * ch, hidden_sizes=[8 * ch], kernel_sizes=[3], n_layers=1),
+        #     GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
+        #     GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2),
+        #     # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+        #     ConvGRU(8 * ch, hidden_sizes=[8 * ch], kernel_sizes=[3], n_layers=1),
+        #     GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
+        #     GResBlock(8 * ch, 4 * ch, n_class=in_dim * 2),
+        #     # ConvGRU(4 * ch, hidden_sizes=[4 * ch, 8 * ch, 4 * ch], kernel_sizes=[3, 5, 5], n_layers=3),
+        #     ConvGRU(4 * ch, hidden_sizes=[4 * ch], kernel_sizes=[3], n_layers=1),
+        #     GResBlock(4 * ch, 4 * ch, n_class=in_dim * 2, upsample_factor=1),
+        #     GResBlock(4 * ch, 2 * ch, n_class=in_dim * 2)
+        # ])
+
         self.conv = nn.ModuleList([
-            ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
-            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 8 * ch], kernel_sizes=[3, 3], n_layers=2),
+            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+            ConvGRU(8 * ch, hidden_sizes=[8 * ch], kernel_sizes=[3], n_layers=1),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2),
-            ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
-            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 8 * ch], kernel_sizes=[3, 3], n_layers=2),
+
+            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+            ConvGRU(8 * ch, hidden_sizes=[8 * ch], kernel_sizes=[3], n_layers=1),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
             GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2),
-            ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
-            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 8 * ch], kernel_sizes=[3, 3], n_layers=2),
-            GResBlock(8 * ch, 8 * ch, n_class=in_dim * 2, upsample_factor=1),
-            GResBlock(8 * ch, 4 * ch, n_class=in_dim * 2),
-            ConvGRU(4 * ch, hidden_sizes=[4 * ch, 8 * ch, 4 * ch], kernel_sizes=[3, 5, 5], n_layers=3),
-            # ConvGRU(4 * ch, hidden_sizes=[4 * ch, 4 * ch], kernel_sizes=[3, 5], n_layers=2),
+
+            # ConvGRU(8 * ch, hidden_sizes=[8 * ch, 16 * ch, 8 * ch], kernel_sizes=[3, 5, 3], n_layers=3),
+            ConvGRU(8 * ch, hidden_sizes=[4 * ch], kernel_sizes=[3], n_layers=1),
             GResBlock(4 * ch, 4 * ch, n_class=in_dim * 2, upsample_factor=1),
-            GResBlock(4 * ch, 2 * ch, n_class=in_dim * 2)
+            GResBlock(4 * ch, 4 * ch, n_class=in_dim * 2),
+
+            # ConvGRU(4 * ch, hidden_sizes=[4 * ch, 8 * ch, 4 * ch], kernel_sizes=[3, 5, 5], n_layers=3),
+            ConvGRU(4 * ch, hidden_sizes=[2 * ch], kernel_sizes=[3], n_layers=1),
+            GResBlock(2 * ch, 2 * ch, n_class=in_dim * 2, upsample_factor=1),
+            GResBlock(2 * ch, 2 * ch, n_class=in_dim * 2)
         ])
 
+        self.bn = ConditionalNorm(2 * ch, n_condition = in_dim * 2)
         # TODO impl ScaledCrossReplicaBatchNorm
         # self.ScaledCrossReplicaBN = ScaledCrossReplicaBatchNorm2d(1 * chn)
 
@@ -69,12 +94,26 @@ class Generator(nn.Module):
 
         class_emb = self.embedding(class_id)
 
-        if self.hierar_flag is True:
-            y = self.affine_transfrom(torch.cat((noise_emb[0], class_emb), dim=1)) # B x (2 x ld x ch)
-        else:
-            y = self.affine_transfrom(torch.cat((noise_emb, class_emb), dim=1)) # B x (2 x ld x ch)
+        # print(class_emb.size())
+        # print(torch.cat((noise_emb[0], class_emb), dim=1).size())
+        y = torch.cat((noise_emb, class_emb), dim=1)
+        y = y.view(y.size(0), -1, 4, 4)
+        y = self.affine_transform(y)
+        # print(y.size())
 
-        y = y.view(-1, 8 * self.ch, self.latent_dim, self.latent_dim) # B x ch x ld x ld
+        condition = torch.cat([noise_emb, class_emb], dim=1)
+        _, dim = condition.size()
+        condition = condition.unsqueeze(1)
+        condition = condition.repeat(1, self.n_frames, 1)
+        condition = condition.view(-1, dim)
+        # exit()
+        #
+        # if self.hierar_flag is True:
+        #     y = self.affine_transfrom(torch.cat((noise_emb[0], class_emb), dim=1)) # B x (2 x ld x ch)
+        # else:
+        #     y = self.affine_transfrom(torch.cat((noise_emb, class_emb), dim=1)) # B x (2 x ld x ch)
+        #
+        # y = y.view(-1, 8 * self.ch, self.latent_dim, self.latent_dim) # B x ch x ld x ld
 
         for k, conv in enumerate(self.conv):
             if isinstance(conv, ConvGRU):
@@ -101,21 +140,21 @@ class Generator(nn.Module):
                 y = torch.cat(frame_hidden_list, dim=0) # T x B x ch x ld x ld
 
                 y = y.permute(1, 0, 2, 3, 4).contiguous() # B x T x ch x ld x ld
-                # print(y.size())
                 B, T, C, W, H = y.size()
                 y = y.view(-1, C, W, H)
 
             elif isinstance(conv, GResBlock):
-                condition = torch.cat([noise_emb, class_emb], dim=1)
-                condition = condition.repeat(self.n_frames,1)
                 y = conv(y, condition) # BT, C, W, H
 
+
+        y = self.bn(y, condition)
         y = F.relu(y)
         y = self.colorize(y)
         y = torch.tanh(y)
 
         BT, C, W, H = y.size()
         y = y.view(-1, self.n_frames, C, W, H) # B, T, C, W, H
+
 
         return y
 
